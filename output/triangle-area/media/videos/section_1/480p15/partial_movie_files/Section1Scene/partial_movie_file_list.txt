@@ -1,0 +1,13 @@
+# This file is used internally by FFMPEG.
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/1185818338_401466115_3074191903.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_349156215_1992601196.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_4071516364_2518311154.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_2605477104_2903173443.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_2257255733_3725117263.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_4071516364_2930663803.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_2473662029_3710248934.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_1258494831_977403644.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_2382739756_306383961.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_2341082278_975845088.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_877109269_1057424673.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/triangle-area/media/videos/section_1/480p15/partial_movie_files/Section1Scene/624642324_4071516364_3343064351.mp4'

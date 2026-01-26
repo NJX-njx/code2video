@@ -1,0 +1,75 @@
+{
+  "topic": "Area of a Circle",
+  "sections": [
+    {
+      "id": "section_1",
+      "title": "Radius & Diameter",
+      "lecture_lines": [
+        "Start with a circle.",
+        "Mark the center.",
+        "Draw a radius.",
+        "Double it: diameter."
+      ],
+      "animations": [
+        "Fade in a thin white circle at screen center.",
+        "A cyan dot flashes twice at center.",
+        "A thin magenta line grows from center to edge.",
+        "Radius duplicates, rotates, extends to opposite side, both flash yellow."
+      ]
+    },
+    {
+      "id": "section_2",
+      "title": "Cut & Rearrange",
+      "lecture_lines": [
+        "Slice circle like pizza.",
+        "Split into 8 wedges.",
+        "Fan wedges out.",
+        "Flip every other piece."
+      ],
+      "animations": [
+        "White circle fills with light-blue; 8 thin white cuts appear simultaneously.",
+        "Wedges slightly separate, still touching at center.",
+        "Wedges rotate outward into a fan, gaps widen.",
+        "Alternate wedges flip 180°, interlocking into a jagged rectangle."
+      ]
+    },
+    {
+      "id": "section_3",
+      "title": "Approximate Rectangle",
+      "lecture_lines": [
+        "Edges become straighter.",
+        "Width equals radius.",
+        "Length: half circumference.",
+        "Shape morphs to rectangle."
+      ],
+      "animations": [
+        "Jagged edges flash cyan twice, then smooth into straight lines.",
+        "Left edge shortens to radius length, labeled 'r' in white.",
+        "Top edge stretches to πr, labeled 'πr' in white.",
+        "Entire shape scales slightly to perfect rectangle, outline bold yellow."
+      ]
+    },
+    {
+      "id": "section_4",
+      "title": "Area Formula",
+      "lecture_lines": [
+        "Area of rectangle?",
+        "Length times width.",
+        "πr times r.",
+        "Equals πr squared."
+      ],
+      "animations": [
+        "Rectangle interior flashes white once.",
+        "Formula 'πr × r' fades in below rectangle in cyan.",
+        "Multiplication simplifies to 'πr²' in larger white font.",
+        "Formula scales up, rectangle fades out, leaving centered 'A = πr²'."
+      ]
+    }
+  ],
+  "available_assets": {
+    "pizza": "output/area-of-a-circle/assets/pizza.svg",
+    "wedges": "output/area-of-a-circle/assets/wedges.svg",
+    "rectangle": "output/area-of-a-circle/assets/rectangle.svg",
+    "ruler": "output/area-of-a-circle/assets/ruler.svg"
+  }
+}

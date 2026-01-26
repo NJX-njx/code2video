@@ -1,0 +1,67 @@
+{
+  "topic": "Triangle Area",
+  "sections": [
+    {
+      "id": "section_1",
+      "title": "The Formula",
+      "lecture_lines": [
+        "Triangle area equals half base times height.",
+        "Area = ½ × base × height.",
+        "Why half? Watch the rectangle split."
+      ],
+      "animations": [
+        "Fade in large white text '½ × b × h' centered on black.",
+        "Color-change '½' to flashing yellow, then back to white.",
+        "Draw horizontal rectangle; diagonal splits it into two identical right triangles; one triangle flashes."
+      ]
+    },
+    {
+      "id": "section_2",
+      "title": "Pick Any Side as Base",
+      "lecture_lines": [
+        "Any side can be the base.",
+        "Rotate triangle; base label hops to new side.",
+        "Height always meets base at right angle."
+      ],
+      "animations": [
+        "Show scalene triangle; three sides glow cyan in turn.",
+        "Base label slides smoothly to each glowing side while triangle rotates gently.",
+        "Perpendicular dashed line drops from opposite vertex to current base; line flashes magenta."
+      ]
+    },
+    {
+      "id": "section_3",
+      "title": "Same Base, Same Height, Same Area",
+      "lecture_lines": [
+        "Slide vertex parallel to base.",
+        "Area stays constant during slide.",
+        "Visual proof via rectangle halves."
+      ],
+      "animations": [
+        "Draw fixed base; triangle vertex slides horizontally leaving faint trail.",
+        "Area label '½ b h' remains unchanged while vertex moves; label flashes green once.",
+        "Ghosted rectangles formed with each new position appear then fade, all showing equal halves."
+      ]
+    },
+    {
+      "id": "section_4",
+      "title": "Quick Examples",
+      "lecture_lines": [
+        "Base 6, height 4: area 12.",
+        "Base 10, height 5: area 25.",
+        "Right triangle legs 3-4: area 6."
+      ],
+      "animations": [
+        "Draw triangle; values '6' and '4' slide beside base and height; '12' zooms in center.",
+        "Wipe previous; new triangle scales up; values '10' and '5' fade in; '25' pops with bold scale.",
+        "Show right triangle; legs self-label '3' and '4'; rotate copy to form rectangle; half flashes revealing '6'."
+      ]
+    }
+  ],
+  "available_assets": {
+    "triangle": "output/triangle-area/assets/triangle.svg",
+    "rectangle": "output/triangle-area/assets/rectangle.svg",
+    "ruler": "output/triangle-area/assets/ruler.svg",
+    "protractor": "output/triangle-area/assets/protractor.svg"
+  }
+}

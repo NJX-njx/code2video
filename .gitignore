@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# 环境变量（包含敏感信息）
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Output（可选：如果不想提交生成的视频）
+# output/

@@ -1,0 +1,10 @@
+# This file is used internally by FFMPEG.
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/1185818338_79743361_2544683174.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/624642324_1772774636_3075303388.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/624642324_4071516364_4292174864.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/624642324_2526736182_3208309107.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/624642324_416506724_1427608968.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/624642324_4071516364_3884745313.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/624642324_17880286_3351886979.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/624642324_4209540278_328679172.mp4'
+file 'file:/Users/njx/Desktop/mathvideo/output/勾股定理讲解/media/videos/section_2/480p15/partial_movie_files/Section2Scene/624642324_4071516364_2077814166.mp4'
