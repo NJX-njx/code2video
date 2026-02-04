@@ -117,10 +117,10 @@ def generate_storyboard(prompt: str, image_paths: Optional[List[str]] = None):
     llm = get_llm(temperature=0.7)
     # 从提示模板创建聊天提示模板
     # PLANNER_PROMPT包含故事板生成的详细指令和格式要求
-    prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
+    prompt_template = ChatPromptTemplate.from_template(PLANNER_PROMPT)
     # 构建处理链：提示模板 -> LLM -> JSON解析器
     # 使用管道操作符（|）连接各个处理步骤
-    chain = prompt | llm | JsonOutputParser()
+    chain = prompt_template | llm | JsonOutputParser()
     
     # 打印开始生成故事板的信息
     print(f"Planning storyboard for: {prompt or '（仅图片输入）'}...")
