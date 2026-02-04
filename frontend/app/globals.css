@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 30, 30, 46;
+  --background-end-rgb: 24, 24, 37;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #585b70;
+}
+
+/* 日志样式 */
+.log-info {
+  color: #cdd6f4;
+}
+
+.log-success {
+  color: #a6e3a1;
+}
+
+.log-warning {
+  color: #f9e2af;
+}
+
+.log-error {
+  color: #f38ba8;
+}
+
+/* Monaco Editor 容器 */
+.monaco-container {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 动画 */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(137, 180, 250, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(137, 180, 250, 0.8);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

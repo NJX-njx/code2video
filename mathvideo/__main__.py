@@ -1,5 +1,3 @@
-"""Backward-compatible CLI entrypoint."""
-
 from mathvideo.cli import main
 
 

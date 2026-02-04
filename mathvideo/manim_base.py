@@ -171,7 +171,7 @@ if not LATEX_AVAILABLE:
     
     # 技术说明：
     # - 由于我们使用`from manim import *`，无法直接在本地覆盖MathTex
-    # - 生成的脚本通常使用`from manim import *`和`from src.manim_base import TeachingScene`
+    # - 生成的脚本通常使用`from manim import *`和`from mathvideo.manim_base import TeachingScene`
     # - 如果只在这里定义MathTex，不会覆盖`from manim import *`导入的版本
     # - 解决方案：直接修改manim模块的MathTex属性（猴子补丁）
     

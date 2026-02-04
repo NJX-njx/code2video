@@ -5,9 +5,9 @@ from langchain_core.prompts import ChatPromptTemplate
 # 导入LangChain的字符串输出解析器，用于提取LLM生成的代码文本
 from langchain_core.output_parsers import StrOutputParser
 # 从llm_client模块导入get_llm函数，用于创建LLM客户端
-from src.llm_client import get_llm
+from mathvideo.llm_client import get_llm
 # 从prompts模块导入代码生成和修复的提示模板
-from src.agents.prompts import CODER_PROMPT, FIX_CODE_PROMPT, REFINE_CODE_PROMPT
+from mathvideo.agents.prompts import CODER_PROMPT, FIX_CODE_PROMPT, REFINE_CODE_PROMPT
 
 def generate_code(section_data: dict):
     """

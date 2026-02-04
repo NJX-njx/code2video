@@ -1,13 +1,13 @@
 # MathVideo: 自动化数学视频生成器
 
-一个利用大语言模型 (Kimi/GPT) 和 Manim 自动生成数学讲解视频的端到端系统。
+一个利用大语言模型 (Claude) 和 Manim 自动生成数学讲解视频的端到端系统。
 
 ## ✨ 核心特性
 
 - **🤖 智能规划**: 使用 LLM 自动将数学主题拆解为结构化的分镜脚本
 - **🎬 代码生成**: 自动生成 Manim Python 动画代码
 - **🔧 自动修复**: 渲染失败时自动分析错误并修复代码
-- **👁️ 视觉反馈**: 使用视觉大模型 (Qwen2.5-VL) 分析生成的视频帧，检测布局问题
+- **👁️ 视觉反馈**: 使用视觉大模型 (Claude Vision) 分析生成的视频帧，检测布局问题
 - **✨ 智能优化**: 根据视觉反馈自动优化代码，提升视频质量
 - **🖼️ 资产管理**: 自动识别并下载/生成所需的图标资源
 
@@ -45,14 +45,14 @@ pip install -r requirements.txt
 
 ### 4. 配置 API 密钥
 
-编辑 `src/config.py`:
+复制 `.env.example` 为 `.env` 并填入密钥（推荐），配置项由 `mathvideo/config.py` 读取：
 
 ```python
-# 必填: Kimi API (用于代码生成)
-KIMI_API_KEY = "your-kimi-api-key"
+# 必填: Claude API (用于规划/代码生成/视觉分析)
+CLAUDE_API_KEY = "your-claude-api-key"
 
-# 可选: Hugging Face API (用于视觉反馈)
-HF_API_KEY = "your-huggingface-api-key"
+# 可选: Gemini API (用于独立视觉测试脚本)
+GEMINI_API_KEY = "your-gemini-api-key"
 
 # 可选: IconFinder API (用于资产下载)
 ICONFINDER_API_KEY = "your-iconfinder-api-key"
@@ -64,10 +64,16 @@ ICONFINDER_API_KEY = "your-iconfinder-api-key"
 
 ```bash
 # 生成并渲染视频
-python main.py "勾股定理" --render
+python -m mathvideo "勾股定理" --render
 
 # 仅生成脚本，不渲染
-python main.py "圆的面积"
+python -m mathvideo "圆的面积"
+```
+
+兼容旧入口（仍可用）：
+
+```bash
+python main.py "勾股定理" --render
 ```
 
 ### 输出结构
@@ -97,13 +103,13 @@ output/
 
 | 模块 | 文件 | 功能 |
 |------|------|------|
-| **Planner** | `src/agents/planner.py` | 将主题转换为分镜脚本 |
-| **Coder** | `src/agents/coder.py` | 生成 Manim 代码 |
-| **Fixer** | `src/agents/coder.py` | 修复运行错误 |
-| **Refiner** | `src/agents/coder.py` | 根据视觉反馈优化代码 |
-| **Critic** | `src/agents/critic.py` | 视觉质量分析 |
-| **AssetManager** | `src/agents/asset_manager.py` | 资产下载/生成 |
-| **TeachingScene** | `src/manim_base.py` | Manim 基础类和网格系统 |
+| **Planner** | `mathvideo/agents/planner.py` | 将主题转换为分镜脚本 |
+| **Coder** | `mathvideo/agents/coder.py` | 生成 Manim 代码 |
+| **Fixer** | `mathvideo/agents/coder.py` | 修复运行错误 |
+| **Refiner** | `mathvideo/agents/coder.py` | 根据视觉反馈优化代码 |
+| **Critic** | `mathvideo/agents/critic.py` | 视觉质量分析 |
+| **AssetManager** | `mathvideo/agents/asset_manager.py` | 资产下载/生成 |
+| **TeachingScene** | `mathvideo/manim_base.py` | Manim 基础类和网格系统 |
 
 ### 工作流程
 
@@ -187,14 +193,16 @@ mark = self.add_right_angle_mark(polygon, vertex_index=1)
 
 ## 🔧 配置选项
 
-在 `src/config.py` 中可配置：
+在 `mathvideo/config.py` 中可配置：
 
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
 | `USE_VISUAL_FEEDBACK` | 启用视觉反馈优化 | `True` |
-| `KIMI_API_KEY` | Kimi API 密钥 | 必填 |
-| `HF_API_KEY` | Hugging Face API 密钥 | 可选 |
-| `HF_VISION_MODEL_NAME` | 视觉模型名称 | `Qwen/Qwen2.5-VL-72B-Instruct` |
+| `CLAUDE_API_KEY` | Claude API 密钥 | 必填 |
+| `CLAUDE_MODEL_NAME` | Claude 模型名称 | `claude-opus-4-5-20251101` |
+| `GEMINI_API_KEY` | Gemini API 密钥 | 可选 |
+| `GEMINI_VISION_MODEL_NAME` | Gemini 视觉模型名称 | `gemini-2.0-flash` |
+| `ICONFINDER_API_KEY` | IconFinder API 密钥 | 可选 |
 
 ## 📚 相关项目
 

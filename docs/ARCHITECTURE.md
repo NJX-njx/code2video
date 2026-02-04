@@ -46,7 +46,7 @@ flowchart TB
         H{启用视觉反馈?}
         H1[Visual Critic<br/>视觉批评家]
         H2[FFmpeg 提取关键帧<br/>每秒1帧, 最多4帧]
-        H3[发送到 Qwen2.5-VL<br/>视觉大模型]
+        H3[发送到 Claude Vision<br/>视觉大模型]
         H4[分析布局、几何正确性]
         H5{发现问题?}
     end
@@ -136,7 +136,7 @@ flowchart TB
 **输入**: 数学主题字符串 (如 "勾股定理")
 
 **处理**:
-- 调用 Kimi LLM
+- 调用 Claude LLM
 - 使用 `PLANNER_PROMPT` 模板
 - 生成结构化的 JSON 分镜脚本
 
@@ -172,7 +172,7 @@ flowchart TB
 **输入**: 单个 section 数据
 
 **处理**:
-- 调用 Kimi LLM
+- 调用 Claude LLM
 - 使用 `CODER_PROMPT` 模板
 - 生成继承自 `TeachingScene` 的 Manim 代码
 
@@ -196,7 +196,7 @@ flowchart TB
 **输入**: 原始代码 + 错误信息
 
 **处理**:
-- 调用 Kimi LLM
+- 调用 Claude LLM
 - 使用 `FIX_CODE_PROMPT` 模板
 - 分析错误并生成修复代码
 
@@ -211,7 +211,7 @@ flowchart TB
 **处理**:
 1. FFmpeg 提取关键帧 (每秒1帧, 最多4帧)
 2. Base64 编码图像
-3. 发送到 Qwen2.5-VL 视觉模型
+3. 发送到 Claude Vision 视觉模型
 4. 分析布局、几何正确性、文字可读性
 
 **输出**: JSON 反馈
@@ -230,7 +230,7 @@ flowchart TB
 **输入**: 原始代码 + 视觉反馈建议
 
 **处理**:
-- 调用 Kimi LLM
+- 调用 Claude LLM
 - 使用 `REFINE_CODE_PROMPT` 模板
 - 仅调整视觉参数,不改变逻辑
 

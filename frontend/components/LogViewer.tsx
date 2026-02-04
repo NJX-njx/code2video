@@ -1,0 +1,139 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
+
+interface LogMessage {
+  level: 'info' | 'success' | 'warning' | 'error';
+  message: string;
+  timestamp: Date;
+}
+
+interface LogViewerProps {
+  taskId: string | null;
+  logs: LogMessage[];
+  onLog: (level: LogMessage['level'], message: string) => void;
+  onStatusChange: (status: 'idle' | 'running' | 'completed' | 'failed') => void;
+}
+
+export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogViewerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // 自动滚动到底部
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [logs]);
+
+  // WebSocket 连接
+  useEffect(() => {
+    if (!taskId) return;
+
+    // 连接 WebSocket
+    const wsUrl = `ws://localhost:8000/api/generate/ws/${taskId}`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      onLog('info', '📡 已连接到服务器，等待日志...');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'log') {
+          onLog(data.level || 'info', data.message);
+        } else if (data.type === 'status') {
+          onStatusChange(data.status);
+          if (data.status === 'completed') {
+            onLog('success', '🎉 所有任务已完成！');
+          } else if (data.status === 'failed') {
+            onLog('error', `💥 任务失败: ${data.data?.error || '未知错误'}`);
+          }
+        } else if (data.type === 'connected') {
+          // 已连接消息，忽略
+        } else if (data.type === 'heartbeat' || data.type === 'pong') {
+          // 心跳消息，忽略
+        }
+      } catch (e) {
+        console.error('解析 WebSocket 消息失败:', e);
+      }
+    };
+
+    ws.onerror = () => {
+      onLog('error', '❌ WebSocket 连接错误');
+    };
+
+    ws.onclose = () => {
+      onLog('info', '📡 连接已断开');
+    };
+
+    // 心跳保活
+    const heartbeat = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send('ping');
+      }
+    }, 25000);
+
+    return () => {
+      clearInterval(heartbeat);
+      ws.close();
+    };
+  }, [taskId, onLog, onStatusChange]);
+
+  // 获取日志级别对应的样式类
+  const getLevelClass = (level: LogMessage['level']) => {
+    switch (level) {
+      case 'success':
+        return 'log-success';
+      case 'warning':
+        return 'log-warning';
+      case 'error':
+        return 'log-error';
+      default:
+        return 'log-info';
+    }
+  };
+
+  // 格式化时间
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="bg-manim-surface rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+        <h3 className="font-medium">生成日志</h3>
+        <span className="text-sm text-gray-400">{logs.length} 条消息</span>
+      </div>
+      
+      <div
+        ref={containerRef}
+        className="h-96 overflow-y-auto p-4 font-mono text-sm bg-manim-bg"
+      >
+        {logs.length === 0 ? (
+          <div className="text-gray-500 text-center py-8">
+            等待日志输出...
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {logs.map((log, index) => (
+              <div key={index} className={`${getLevelClass(log.level)} flex`}>
+                <span className="text-gray-500 mr-3 shrink-0">
+                  [{formatTime(log.timestamp)}]
+                </span>
+                <span className="whitespace-pre-wrap break-all">{log.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

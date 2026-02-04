@@ -5,9 +5,9 @@ from langchain_core.prompts import ChatPromptTemplate
 # 导入LangChain的JSON输出解析器，用于将LLM输出解析为JSON格式
 from langchain_core.output_parsers import JsonOutputParser
 # 从llm_client模块导入get_llm函数，用于创建LLM客户端
-from src.llm_client import get_llm
+from mathvideo.llm_client import get_llm
 # 从prompts模块导入故事板生成的提示模板
-from src.agents.prompts import PLANNER_PROMPT
+from mathvideo.agents.prompts import PLANNER_PROMPT
 
 def generate_storyboard(topic: str):
     """

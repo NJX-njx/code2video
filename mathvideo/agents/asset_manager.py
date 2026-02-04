@@ -3,9 +3,9 @@ import os
 import requests
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-from src.llm_client import get_llm
-from src.agents.prompts import ASSET_PROMPT
-from src.config import ICONFINDER_API_KEY, USE_ASSETS
+from mathvideo.llm_client import get_llm
+from mathvideo.agents.prompts import ASSET_PROMPT
+from mathvideo.config import ICONFINDER_API_KEY, USE_ASSETS
 
 class AssetManager:
     def __init__(self, assets_dir):

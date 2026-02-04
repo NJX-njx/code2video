@@ -61,7 +61,7 @@ CODER_PROMPT = """
 动画描述: {animations}
 
 ## 要求
-1. **基类**: 必须继承自 `TeachingScene` (从 `src.manim_base` 导入)。
+1. **基类**: 必须继承自 `TeachingScene` (从 `mathvideo.manim_base` 导入)。
 2. **布局**:
    - 在 `construct` 开头调用 `self.setup_layout("{title}", {lecture_lines})`。
    - 这会处理左侧文本。不要自己创建讲义文本。
@@ -135,7 +135,7 @@ CODER_PROMPT = """
 ## 代码结构
 ```python
 # 首先导入 TeachingScene 以确保环境补丁工作 (例如 LaTeX 回退)
-from src.manim_base import TeachingScene
+from mathvideo.manim_base import TeachingScene
 from manim import *
 
 class SectionScene(TeachingScene):
@@ -273,7 +273,7 @@ REFINE_CODE_PROMPT = """
 5. 确保代码仍然可以运行并继承自 `TeachingScene`。
 6. **强制**: 必须在顶部包含导入:
    ```python
-   from src.manim_base import TeachingScene
+   from mathvideo.manim_base import TeachingScene
    from manim import *
    ```
 7.记得留心注意生成的几何图形的位置、大小有问题的情况以及发生错误重叠的情况

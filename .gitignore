@@ -20,5 +20,9 @@ ENV/
 *.swp
 *.swo
 
-# Output（可选：如果不想提交生成的视频）
-# output/
+# Output（生成的视频与中间产物）
+output/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/

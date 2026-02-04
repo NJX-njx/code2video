@@ -1,25 +1,52 @@
 import json
 import base64
-from openai import OpenAI
-from src.agents.prompts import CRITIC_PROMPT
-from src.config import USE_VISUAL_FEEDBACK, HF_API_KEY, HF_BASE_URL, HF_VISION_MODEL_NAME
+import requests
+from mathvideo.agents.prompts import CRITIC_PROMPT
+from mathvideo.config import USE_VISUAL_FEEDBACK, CLAUDE_API_KEY, CLAUDE_MODEL_NAME
 
 class VisualCritic:
+    """
+    视觉评估器：使用 Claude Opus 4.5 Vision 对渲染的视频帧进行分析和反馈。
+    Claude 支持多模态输入，可以直接分析图片内容。
+    """
     def __init__(self):
         pass
 
-    def _get_vision_client(self):
+    def _call_claude_vision(self, messages_content):
         """
-        Creates a raw OpenAI client for Hugging Face Vision API.
+        直接调用 Claude API 进行视觉分析。
+        使用 HTTP 请求而非 SDK，以确保兼容性。
         """
-        return OpenAI(
-            base_url=HF_BASE_URL,
-            api_key=HF_API_KEY
+        headers = {
+            "x-api-key": CLAUDE_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+        
+        payload = {
+            "model": CLAUDE_MODEL_NAME,
+            "max_tokens": 1024,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": messages_content
+                }
+            ]
+        }
+        
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=payload,
+            timeout=120
         )
+        response.raise_for_status()
+        return response.json()
 
     def critique(self, video_path, storyboard_section):
         """
         Analyze the video (or frames from it) and return feedback.
+        使用 Claude Opus 4.5 进行视觉分析。
         """
         if not USE_VISUAL_FEEDBACK:
             return None
@@ -39,13 +66,12 @@ class VisualCritic:
             os.remove(f)
             
         try:
-            # Extract frames: 1 frame every 2 seconds to avoid too many images, but ensure we cover the timeline
-            # -vf fps=0.5 means 1 frame every 2 seconds. 
-            # For short videos (e.g. 5s), this gives ~3 frames. For 10s -> 5 frames.
+            # Extract frames: 1 frame per second, scaled to 320px width to reduce payload size
+            # 缩小图片尺寸可以减少 token 消耗并加快响应速度
             image_pattern = os.path.join(frames_dir, "frame_%03d.png")
             subprocess.run([
                 "ffmpeg", "-i", video_path, 
-                "-vf", "fps=1.0", 
+                "-vf", "fps=1.0,scale=320:-1", 
                 image_pattern, "-y"
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
             
@@ -64,38 +90,27 @@ class VisualCritic:
                 print("   ⚠️ No frames extracted for critique.")
                 return None
 
-            image_contents = []
+            # 3. 构建 Claude Vision API 的消息格式
+            # Claude 使用不同于 OpenAI 的图片格式
+            messages_content = [
+                {"type": "text", "text": CRITIC_PROMPT}
+            ]
+            
             for img_path in selected_frames:
                 with open(img_path, "rb") as image_file:
                     b64_data = base64.b64encode(image_file.read()).decode('utf-8')
-                    image_contents.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{b64_data}"
+                    messages_content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": b64_data
                         }
                     })
 
-            # 3. Call Vision LLM using Raw Client
-            client = self._get_vision_client()
-            
-            messages_payload = [
-                {"type": "text", "text": CRITIC_PROMPT},
-                *image_contents
-            ]
-
-            response = client.chat.completions.create(
-                model=HF_VISION_MODEL_NAME,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": messages_payload
-                    }
-                ],
-                max_tokens=1024,
-                temperature=0.1
-            )
-            
-            content = response.choices[0].message.content
+            # 4. 调用 Claude Vision API
+            response = self._call_claude_vision(messages_content)
+            content = response["content"][0]["text"]
             
             # Parse JSON
             content = content.replace("```json", "").replace("```", "").strip()
