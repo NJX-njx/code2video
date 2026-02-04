@@ -34,8 +34,11 @@ CLAUDE_MODEL_NAME = os.getenv("CLAUDE_MODEL_NAME", "claude-opus-4-5-20251101")
 # 从环境变量读取，请设置 GEMINI_API_KEY 环境变量
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Gemini API 基础 URL (使用 OpenAI 兼容接口)
+# Gemini API 基础 URL (OpenAI 兼容接口，已保留但默认使用原生 API)
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
+# Gemini 原生 API Base URL
+GEMINI_NATIVE_BASE_URL = os.getenv("GEMINI_NATIVE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
 
 # 使用的视觉模型名称
 # "gemini-3-pro-preview" 是 Gemini 3 Pro 在 Gemini API 中的模型标识

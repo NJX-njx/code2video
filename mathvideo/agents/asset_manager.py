@@ -76,25 +76,45 @@ class AssetManager:
         }
         
         try:
-            response = requests.get(url, headers=headers, params=params)
+            response = requests.get(url, headers=headers, params=params, timeout=20)
+            if response.status_code != 200:
+                print(f"   ⚠️ IconFinder error {response.status_code}: {response.text[:200]}")
+                return self._create_placeholder_asset(keyword, local_path)
+
             data = response.json()
-            if data['icons']:
-                icon = data['icons'][0]
-                # Try to get largest PNG
-                raster = icon['raster_sizes'][-1]
-                img_url = raster['formats'][0]['preview_url']
-                
-                # Download
-                local_path = os.path.join(self.assets_dir, f"{keyword}.png")
-                img_data = requests.get(img_url).content
-                with open(local_path, "wb") as f:
-                    f.write(img_data)
-                print(f"   Downloaded: {local_path}")
-                return local_path
+            icons = data.get('icons') or []
+            if not icons:
+                print(f"   ⚠️ No icons found for '{keyword}', using placeholder")
+                return self._create_placeholder_asset(keyword, local_path)
+
+            icon = icons[0]
+            # Try to get largest PNG
+            raster_sizes = icon.get('raster_sizes') or []
+            if not raster_sizes:
+                print(f"   ⚠️ No raster sizes for '{keyword}', using placeholder")
+                return self._create_placeholder_asset(keyword, local_path)
+
+            raster = raster_sizes[-1]
+            formats = raster.get('formats') or []
+            if not formats:
+                print(f"   ⚠️ No raster formats for '{keyword}', using placeholder")
+                return self._create_placeholder_asset(keyword, local_path)
+
+            img_url = formats[0].get('preview_url')
+            if not img_url:
+                print(f"   ⚠️ Missing preview URL for '{keyword}', using placeholder")
+                return self._create_placeholder_asset(keyword, local_path)
+            
+            # Download
+            local_path = os.path.join(self.assets_dir, f"{keyword}.png")
+            img_data = requests.get(img_url, timeout=20).content
+            with open(local_path, "wb") as f:
+                f.write(img_data)
+            print(f"   Downloaded: {local_path}")
+            return local_path
         except Exception as e:
             print(f"   Download failed for {keyword}: {e}")
-            
-        return None
+            return self._create_placeholder_asset(keyword, local_path)
 
     def _create_placeholder_asset(self, keyword, path):
         """
