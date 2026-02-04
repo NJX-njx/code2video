@@ -46,7 +46,7 @@ flowchart TB
         H{启用视觉反馈?}
         H1[Visual Critic<br/>视觉批评家]
         H2[FFmpeg 提取关键帧<br/>每秒1帧, 最多4帧]
-        H3[发送到 Claude Vision<br/>视觉大模型]
+        H3[发送到 Gemini 3 Pro<br/>视觉大模型]
         H4[分析布局、几何正确性]
         H5{发现问题?}
     end
@@ -211,7 +211,7 @@ flowchart TB
 **处理**:
 1. FFmpeg 提取关键帧 (每秒1帧, 最多4帧)
 2. Base64 编码图像
-3. 发送到 Claude Vision 视觉模型
+3. 发送到 Gemini 3 Pro 视觉模型
 4. 分析布局、几何正确性、文字可读性
 
 **输出**: JSON 反馈

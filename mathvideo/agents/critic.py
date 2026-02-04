@@ -1,54 +1,48 @@
-import json
 import base64
-import requests
+import json
+from openai import OpenAI
 from mathvideo.agents.prompts import CRITIC_PROMPT
-from mathvideo.config import USE_VISUAL_FEEDBACK, CLAUDE_API_KEY, CLAUDE_MODEL_NAME
+from mathvideo.config import (
+    USE_VISUAL_FEEDBACK,
+    GEMINI_API_KEY,
+    GEMINI_BASE_URL,
+    GEMINI_VISION_MODEL_NAME,
+)
 
 class VisualCritic:
     """
-    视觉评估器：使用 Claude Opus 4.5 Vision 对渲染的视频帧进行分析和反馈。
-    Claude 支持多模态输入，可以直接分析图片内容。
+    视觉评估器：使用 Gemini 3 Pro 对渲染的视频帧进行分析和反馈。
+    Gemini 支持多模态输入，可以直接分析图片内容。
     """
     def __init__(self):
-        pass
+        self.enabled = USE_VISUAL_FEEDBACK and bool(GEMINI_API_KEY)
+        self.client = None
+        if self.enabled:
+            self.client = OpenAI(
+                base_url=GEMINI_BASE_URL,
+                api_key=GEMINI_API_KEY,
+                timeout=120
+            )
 
-    def _call_claude_vision(self, messages_content):
+    def _call_gemini_vision(self, messages_content):
         """
-        直接调用 Claude API 进行视觉分析。
-        使用 HTTP 请求而非 SDK，以确保兼容性。
+        调用 Gemini API 进行视觉分析（OpenAI 兼容接口）。
         """
-        headers = {
-            "x-api-key": CLAUDE_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
-        }
-        
-        payload = {
-            "model": CLAUDE_MODEL_NAME,
-            "max_tokens": 1024,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": messages_content
-                }
-            ]
-        }
-        
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers=headers,
-            json=payload,
-            timeout=120
+        response = self.client.chat.completions.create(
+            model=GEMINI_VISION_MODEL_NAME,
+            messages=[{"role": "user", "content": messages_content}],
+            max_tokens=1024
         )
-        response.raise_for_status()
-        return response.json()
+        return response.choices[0].message.content
 
     def critique(self, video_path, storyboard_section):
         """
         Analyze the video (or frames from it) and return feedback.
-        使用 Claude Opus 4.5 进行视觉分析。
+        使用 Gemini 3 Pro 进行视觉分析。
         """
-        if not USE_VISUAL_FEEDBACK:
+        if not self.enabled:
+            if USE_VISUAL_FEEDBACK and not GEMINI_API_KEY:
+                print("   ⚠️ GEMINI_API_KEY 未设置，跳过视觉分析。")
             return None
 
         print(f"🧐 Critiquing video: {video_path}")
@@ -90,27 +84,23 @@ class VisualCritic:
                 print("   ⚠️ No frames extracted for critique.")
                 return None
 
-            # 3. 构建 Claude Vision API 的消息格式
-            # Claude 使用不同于 OpenAI 的图片格式
+            # 3. 构建 Gemini Vision API 的消息格式（OpenAI 兼容）
             messages_content = [
                 {"type": "text", "text": CRITIC_PROMPT}
             ]
-            
+
             for img_path in selected_frames:
                 with open(img_path, "rb") as image_file:
-                    b64_data = base64.b64encode(image_file.read()).decode('utf-8')
+                    b64_data = base64.b64encode(image_file.read()).decode("utf-8")
                     messages_content.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/png",
-                            "data": b64_data
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{b64_data}"
                         }
                     })
 
-            # 4. 调用 Claude Vision API
-            response = self._call_claude_vision(messages_content)
-            content = response["content"][0]["text"]
+            # 4. 调用 Gemini Vision API
+            content = self._call_gemini_vision(messages_content)
             
             # Parse JSON
             content = content.replace("```json", "").replace("```", "").strip()

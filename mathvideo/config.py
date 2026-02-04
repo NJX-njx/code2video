@@ -38,8 +38,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 # 使用的视觉模型名称
-# "gemini-2.0-flash" 经测试可用，支持多模态视觉分析且响应速度快
-GEMINI_VISION_MODEL_NAME = "gemini-2.0-flash"
+# "gemini-3-pro-preview" 是 Gemini 3 Pro 在 Gemini API 中的模型标识
+GEMINI_VISION_MODEL_NAME = os.getenv("GEMINI_VISION_MODEL_NAME", "gemini-3-pro-preview")
 
 # ============================================================================
 # 资产与功能配置

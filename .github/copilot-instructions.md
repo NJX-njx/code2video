@@ -10,7 +10,7 @@
   2.  **Asset Manager** (`mathvideo/agents/asset_manager.py`): 下载/生成所需图像资源。
   3.  **Coder** (`mathvideo/agents/coder.py`): 生成 Manim Python 代码。
   4.  **Renderer** (`main.py`): 执行 `manim` 渲染视频。
-  5.  **Refiner Loop** (`mathvideo/agents/critic.py`): 若启用 `USE_VISUAL_FEEDBACK`，使用视觉模型 (Claude Vision) 分析视频帧并自动迭代代码。
+  5.  **Refiner Loop** (`mathvideo/agents/critic.py`): 若启用 `USE_VISUAL_FEEDBACK`，使用视觉模型 (Gemini 3 Pro) 分析视频帧并自动迭代代码。
 
 - **目录结构**: 所有生成内容必须严格遵循 `output/<topic_slug>/` 结构：
     - `storyboard.json`: 核心剧本。
