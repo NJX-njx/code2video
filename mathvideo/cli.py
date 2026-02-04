@@ -6,8 +6,6 @@ import json
 import argparse
 # 导入子进程模块，用于执行Manim渲染命令
 import subprocess
-# 导入正则表达式模块，用于字符串处理和规范化
-import re
 # 从agents模块导入故事板生成函数
 from mathvideo.agents.planner import generate_storyboard
 # 从agents模块导入代码生成和修复函数
@@ -15,35 +13,7 @@ from mathvideo.agents.coder import generate_code, fix_code, refine_code
 from mathvideo.agents.asset_manager import AssetManager
 from mathvideo.agents.critic import VisualCritic
 from mathvideo.config import USE_VISUAL_FEEDBACK
-
-
-def slugify(value):
-    """
-    将字符串规范化为URL友好的格式（slug格式）
-
-    功能说明：
-    - 将字符串转换为小写
-    - 移除所有非字母数字字符（保留连字符和空格）
-    - 将多个连续的空格或连字符替换为单个连字符
-    - 去除首尾的连字符和下划线
-
-    参数:
-        value: 需要规范化的字符串（可以是任意类型，会被转换为字符串）
-
-    返回:
-        str: 规范化后的字符串，适合用作文件名或URL路径
-
-    示例:
-        slugify("Hello World!") -> "hello-world"
-        slugify("数学视频 2024") -> "数学视频-2024"
-    """
-    # 将输入值转换为字符串类型，确保后续操作的类型安全
-    value = str(value)
-    # 使用正则表达式移除所有非单词字符（字母、数字、下划线）、非空格、非连字符的字符
-    # 同时将字符串转换为小写
-    value = re.sub(r"[^\w\s-]", "", value.lower())
-    # 将多个连续的连字符或空格替换为单个连字符，并去除首尾的连字符和下划线
-    return re.sub(r"[-\s]+", "-", value).strip("-_")
+from mathvideo.utils import make_slug
 
 
 def main():
@@ -51,14 +21,15 @@ def main():
     主函数：自动数学视频生成器的入口点
 
     功能流程：
-    1. 解析命令行参数（主题和是否渲染）
+    1. 解析命令行参数（文本/图片与是否渲染）
     2. 创建输出目录结构
     3. 生成故事板（storyboard）
     4. 为每个章节生成Manim代码
     5. 如果指定了--render参数，则渲染视频（带自动错误修复）
 
     命令行参数:
-        topic: 要讲解的数学主题（必需参数）
+        prompt: 要讲解的数学主题/问题/描述（可选，若仅使用图片可留空）
+        --image: 输入图片路径（可多次传入）
         --render: 是否立即渲染视频（可选标志）
 
     输出结构:
@@ -73,16 +44,35 @@ def main():
     """
     # 创建命令行参数解析器，设置程序描述
     parser = argparse.ArgumentParser(description="Auto Math Video Generator")
-    # 添加必需的位置参数：数学主题
-    parser.add_argument("topic", type=str, help="The math topic to explain")
+    # 添加可选位置参数：主题/问题/描述（允许为空，配合图片输入）
+    parser.add_argument(
+        "prompt",
+        nargs="?",
+        default="",
+        help="数学主题/知识点/问题/描述（可选，若仅使用图片可留空）",
+    )
+    # 可选图片输入（可重复传入）
+    parser.add_argument(
+        "-i",
+        "--image",
+        action="append",
+        default=[],
+        help="输入图片路径（可多次传入）",
+    )
     # 添加可选标志参数：是否渲染视频
     parser.add_argument("--render", action="store_true", help="Render the video using Manim")
     # 解析命令行参数并存储到args对象中
     args = parser.parse_args()
 
     # 创建结构化的输出目录
-    # 将主题转换为URL友好的格式（用于目录名）
-    topic_slug = slugify(args.topic)
+    # 输入校验：至少提供文本或图片
+    if not args.prompt.strip() and not args.image:
+        print("❌ 请提供文本输入或图片输入（或两者）。")
+        return
+
+    # 生成项目 slug（对长文本做截断+哈希）
+    image_hint = ",".join([os.path.basename(p) for p in args.image]) if args.image else None
+    topic_slug = make_slug(args.prompt.strip() or "image-input", extra=image_hint)
     # 构建基础输出目录路径：output/{topic_slug}
     base_output_dir = os.path.join("output", topic_slug)
     # 构建脚本目录路径：用于存储生成的Python代码文件
@@ -96,13 +86,35 @@ def main():
     os.makedirs(media_dir, exist_ok=True)
 
     # 打印项目启动信息
-    print(f"🚀 Starting project: {args.topic}")
+    print(f"🚀 Starting project: {args.prompt or '（仅图片输入）'}")
     # 打印输出目录路径
     print(f"📂 Output directory: {base_output_dir}")
 
+    # 步骤0：处理输入图片（可选）
+    input_image_paths = []
+    if args.image:
+        inputs_dir = os.path.join(base_output_dir, "inputs")
+        os.makedirs(inputs_dir, exist_ok=True)
+        for idx, img_path in enumerate(args.image, start=1):
+            if not os.path.exists(img_path):
+                print(f"⚠️ 图片不存在，已跳过: {img_path}")
+                continue
+            # 复制到项目输入目录，避免后续路径丢失
+            safe_name = os.path.basename(img_path) or f"input_{idx}.png"
+            target_path = os.path.join(inputs_dir, safe_name)
+            try:
+                import shutil
+                if os.path.abspath(img_path) == os.path.abspath(target_path):
+                    input_image_paths.append(target_path)
+                else:
+                    shutil.copy2(img_path, target_path)
+                    input_image_paths.append(target_path)
+            except Exception as e:
+                print(f"⚠️ 图片复制失败: {img_path} ({e})")
+
     # 步骤1：生成故事板
     # 调用LLM生成故事板JSON结构
-    storyboard = generate_storyboard(args.topic)
+    storyboard = generate_storyboard(args.prompt.strip(), image_paths=input_image_paths)
     # 检查故事板是否生成成功
     if not storyboard:
         # 如果生成失败，打印错误信息并退出程序

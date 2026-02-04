@@ -9,25 +9,26 @@ interface GenerateFormProps {
 }
 
 export default function GenerateForm({ onGenerateStart, disabled }: GenerateFormProps) {
-  const [topic, setTopic] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [render, setRender] = useState(true);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 示例主题
+  // 示例输入
   const examples = [
-    '勾股定理',
-    '圆的面积',
-    '三角形面积',
-    '二次函数',
-    '等差数列',
+    '请讲解勾股定理的证明思路',
+    '已知圆的半径为 r，解释圆面积公式的来源',
+    '这张图里的三角形面积如何计算？',
+    '解释二次函数顶点与对称轴',
+    '给出等差数列通项公式的推导',
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!topic.trim()) {
-      setError('请输入数学主题');
+    if (!prompt.trim() && !imageFile) {
+      setError('请输入文本或上传图片');
       return;
     }
 
@@ -35,13 +36,25 @@ export default function GenerateForm({ onGenerateStart, disabled }: GenerateForm
     setError(null);
 
     try {
-      const response = await fetch('/api/generate/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ topic: topic.trim(), render }),
-      });
+      let response: Response;
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append('prompt', prompt.trim());
+        formData.append('render', render ? 'true' : 'false');
+        formData.append('image', imageFile);
+        response = await fetch('/api/generate/', {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        response = await fetch('/api/generate/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prompt: prompt.trim(), render }),
+        });
+      }
 
       if (!response.ok) {
         const data = await response.json();
@@ -62,18 +75,37 @@ export default function GenerateForm({ onGenerateStart, disabled }: GenerateForm
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 主题输入 */}
         <div>
-          <label htmlFor="topic" className="block text-sm font-medium mb-2">
-            数学主题
+          <label htmlFor="prompt" className="block text-sm font-medium mb-2">
+            输入内容（主题/问题/描述）
           </label>
-          <input
-            id="topic"
-            type="text"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="例如：勾股定理、圆的面积、二次函数..."
-            className="w-full px-4 py-3 bg-manim-bg border border-gray-700 rounded-lg focus:outline-none focus:border-manim-accent transition-colors"
+          <textarea
+            id="prompt"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="例如：请解释勾股定理的证明步骤，或描述一个题目场景..."
+            className="w-full min-h-[96px] px-4 py-3 bg-manim-bg border border-gray-700 rounded-lg focus:outline-none focus:border-manim-accent transition-colors"
             disabled={disabled || loading}
           />
+        </div>
+
+        {/* 图片输入 */}
+        <div>
+          <label htmlFor="image" className="block text-sm font-medium mb-2">
+            上传图片（可选）
+          </label>
+          <input
+            id="image"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+            className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-manim-bg file:text-gray-200 hover:file:bg-gray-700"
+            disabled={disabled || loading}
+          />
+          {imageFile && (
+            <p className="mt-2 text-xs text-gray-400">
+              已选择：{imageFile.name}
+            </p>
+          )}
         </div>
 
         {/* 快速选择示例 */}
@@ -84,7 +116,7 @@ export default function GenerateForm({ onGenerateStart, disabled }: GenerateForm
               <button
                 key={example}
                 type="button"
-                onClick={() => setTopic(example)}
+                onClick={() => setPrompt(example)}
                 className="px-3 py-1 text-sm bg-manim-bg rounded-full hover:bg-gray-700 transition-colors"
                 disabled={disabled || loading}
               >
@@ -110,16 +142,16 @@ export default function GenerateForm({ onGenerateStart, disabled }: GenerateForm
         </div>
 
         {/* 错误提示 */}
-        {error && (
-          <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-lg text-manim-error">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-lg text-manim-error">
+              {error}
+            </div>
+          )}
 
         {/* 提交按钮 */}
         <button
           type="submit"
-          disabled={disabled || loading || !topic.trim()}
+          disabled={disabled || loading || (!prompt.trim() && !imageFile)}
           className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-manim-accent text-manim-bg font-semibold rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
         >
           {loading ? (

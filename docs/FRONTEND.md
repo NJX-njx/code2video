@@ -93,7 +93,7 @@ cd frontend && npm run dev
 
 | 方法 | 端点 | 说明 |
 |------|------|------|
-| POST | `/api/generate/` | 启动生成任务 |
+| POST | `/api/generate/` | 启动生成任务（支持文本与图片输入） |
 | WebSocket | `/api/generate/ws/{task_id}` | 实时日志推送 |
 
 ### 视觉优化

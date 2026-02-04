@@ -7,12 +7,12 @@
 import os
 import sys
 import json
-import re
 import asyncio
 import subprocess
-from typing import Optional
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from typing import Optional, List
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Request
 from pydantic import BaseModel
+from mathvideo.utils import make_slug
 
 router = APIRouter()
 
@@ -25,8 +25,9 @@ active_connections: dict[str, list[WebSocket]] = {}
 
 
 class GenerateRequest(BaseModel):
-    """生成请求模型"""
-    topic: str
+    """生成请求模型（兼容旧字段）"""
+    prompt: Optional[str] = None
+    topic: Optional[str] = None
     render: bool = True
 
 
@@ -38,19 +39,12 @@ class GenerateResponse(BaseModel):
     task_id: Optional[str] = None
 
 
-def slugify(value: str) -> str:
-    """
-    将字符串规范化为 URL 友好格式
-    
-    参数:
-        value: 原始字符串
-    
-    返回:
-        URL 友好的字符串
-    """
-    value = str(value)
-    value = re.sub(r'[^\w\s-]', '', value.lower())
-    return re.sub(r'[-\s]+', '-', value).strip('-_')
+def _parse_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 async def broadcast_log(task_id: str, message: str, level: str = "info"):
@@ -104,7 +98,7 @@ async def broadcast_status(task_id: str, status: str, data: dict = None):
             active_connections[task_id].remove(ws)
 
 
-async def run_generation(task_id: str, topic: str, render: bool):
+async def run_generation(task_id: str, prompt: str, render: bool, image_paths: Optional[List[str]] = None):
     """
     异步执行视频生成流程
     
@@ -115,10 +109,14 @@ async def run_generation(task_id: str, topic: str, render: bool):
     """
     try:
         await broadcast_status(task_id, "running")
-        await broadcast_log(task_id, f"🚀 开始生成项目: {topic}")
+        await broadcast_log(task_id, f"🚀 开始生成项目: {prompt or '（仅图片输入）'}")
         
         # 构建命令（使用包入口，避免依赖根目录脚本）
-        cmd = [sys.executable, "-m", "mathvideo", topic]
+        cmd = [sys.executable, "-m", "mathvideo"]
+        if prompt:
+            cmd.append(prompt)
+        for img_path in (image_paths or []):
+            cmd.extend(["--image", img_path])
         if render:
             cmd.append("--render")
         
@@ -173,7 +171,7 @@ async def run_generation(task_id: str, topic: str, render: bool):
 
 
 @router.post("/", response_model=GenerateResponse)
-async def start_generation(request: GenerateRequest):
+async def start_generation(request: Request):
     """
     启动视频生成任务
     
@@ -183,24 +181,60 @@ async def start_generation(request: GenerateRequest):
     返回:
         任务信息，包括 task_id（用于 WebSocket 订阅）
     """
-    topic = request.topic.strip()
-    
-    if not topic:
-        raise HTTPException(status_code=400, detail="主题不能为空")
-    
+    content_type = request.headers.get("content-type", "")
+    prompt = ""
+    render = True
+    image_paths: List[str] = []
+    image_names: List[str] = []
+
+    if content_type.startswith("application/json"):
+        data = await request.json()
+        prompt = (data.get("prompt") or data.get("topic") or data.get("description") or "").strip()
+        render = bool(data.get("render", True))
+    else:
+        form = await request.form()
+        prompt = (form.get("prompt") or form.get("topic") or form.get("description") or "").strip()
+        render = _parse_bool(form.get("render", True))
+
+        files = []
+        if hasattr(form, "getlist"):
+            files = form.getlist("images") or form.getlist("image") or []
+        # 保存输入图片到 output/<slug>/inputs
+        if files:
+            image_names = [getattr(f, "filename", "") for f in files]
+
+    if not prompt and not image_names:
+        raise HTTPException(status_code=400, detail="请输入文本或上传图片")
+
     # 生成任务 ID（同时也是项目 slug）
-    task_id = slugify(topic)
+    extra = ",".join([n for n in image_names if n]) if image_names else None
+    task_id = make_slug(prompt or "image-input", extra=extra)
+
+    # 处理图片保存（multipart）
+    if "files" in locals() and files:
+        inputs_dir = os.path.join(OUTPUT_DIR, task_id, "inputs")
+        os.makedirs(inputs_dir, exist_ok=True)
+        for idx, file in enumerate(files, start=1):
+            filename = os.path.basename(getattr(file, "filename", "")) or f"input_{idx}.png"
+            target_path = os.path.join(inputs_dir, filename)
+            try:
+                content = await file.read()
+                with open(target_path, "wb") as f:
+                    f.write(content)
+                image_paths.append(target_path)
+            except Exception:
+                continue
     
     # 初始化 WebSocket 连接列表
     if task_id not in active_connections:
         active_connections[task_id] = []
     
     # 异步启动生成任务
-    asyncio.create_task(run_generation(task_id, topic, request.render))
+    asyncio.create_task(run_generation(task_id, prompt, render, image_paths=image_paths))
     
     return GenerateResponse(
         success=True,
-        message=f"生成任务已启动: {topic}",
+        message=f"生成任务已启动: {prompt or '（仅图片输入）'}",
         slug=task_id,
         task_id=task_id
     )

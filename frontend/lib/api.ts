@@ -120,7 +120,8 @@ export async function getVideos(slug: string): Promise<{ videos: VideoInfo[] }> 
 // ============ 生成相关 API ============
 
 export interface GenerateRequest {
-  topic: string;
+  prompt?: string;
+  topic?: string;
   render?: boolean;
 }
 

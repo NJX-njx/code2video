@@ -63,11 +63,14 @@ ICONFINDER_API_KEY = "your-iconfinder-api-key"
 ### 基本用法
 
 ```bash
-# 生成并渲染视频
-python -m mathvideo "勾股定理" --render
+# 生成并渲染视频（文本输入）
+python -m mathvideo "请解释勾股定理的证明思路" --render
 
-# 仅生成脚本，不渲染
-python -m mathvideo "圆的面积"
+# 仅生成脚本，不渲染（描述/问题）
+python -m mathvideo "已知圆的半径为 r，解释圆面积公式的来源"
+
+# 多模态输入（文本 + 图片）
+python -m mathvideo "这张图里的三角形面积如何计算？" --image /path/to/triangle.png --render
 ```
 
 兼容旧入口（仍可用）：
