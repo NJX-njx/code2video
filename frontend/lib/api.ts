@@ -196,13 +196,25 @@ export async function renderSection(slug: string, sectionId: string): Promise<{ 
 /**
  * 创建 WebSocket 连接用于接收生成日志
  */
+// 生成 WebSocket 基础地址
+function getWebSocketBaseUrl(): string {
+  // 客户端侧优先使用当前页面的协议与主机名，避免非 localhost 访问时连接失败
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.hostname || 'localhost';
+    return `${protocol}://${host}:8000`;
+  }
+  return 'ws://localhost:8000';
+}
+
 export function createLogWebSocket(
   taskId: string,
   onMessage: (data: any) => void,
   onError?: (error: Event) => void,
   onClose?: () => void
 ): WebSocket {
-  const ws = new WebSocket(`ws://localhost:8000/api/generate/ws/${taskId}`);
+  const baseUrl = getWebSocketBaseUrl();
+  const ws = new WebSocket(`${baseUrl}/api/generate/ws/${taskId}`);
 
   ws.onmessage = (event) => {
     try {

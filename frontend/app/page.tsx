@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Play, FolderOpen, Plus } from 'lucide-react';
 import GenerateForm from '@/components/GenerateForm';
 import ProjectList from '@/components/ProjectList';
@@ -34,14 +34,14 @@ export default function Home() {
   };
 
   // 添加日志
-  const addLog = (level: LogMessage['level'], message: string) => {
+  const addLog = useCallback((level: LogMessage['level'], message: string) => {
     setLogs(prev => [...prev, { level, message, timestamp: new Date() }]);
-  };
+  }, []);
 
   // 处理状态更新
-  const handleStatusUpdate = (newStatus: GenerateStatus) => {
+  const handleStatusUpdate = useCallback((newStatus: GenerateStatus) => {
     setStatus(newStatus);
-  };
+  }, []);
 
   return (
     <main className="min-h-screen p-8">

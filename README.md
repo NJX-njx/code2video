@@ -45,17 +45,21 @@ pip install -r requirements.txt
 
 ### 4. 配置 API 密钥
 
-复制 `.env.example` 为 `.env` 并填入密钥（推荐），配置项由 `mathvideo/config.py` 读取：
+复制 `.env.example` 为 `.env` 并填入密钥：
 
-```python
-# 必填: Claude API (用于规划/代码生成/视觉分析)
-CLAUDE_API_KEY = "your-claude-api-key"
+```bash
+cp .env.example .env
+# 编辑 .env 文件填入 API 密钥
+```
+
+```dotenv
+# 必填: Claude API (用于规划/代码生成)
+CLAUDE_API_KEY=sk-ant-your-key-here
+CLAUDE_MODEL_NAME=claude-opus-4-5-20251101
 
 # 可选: Gemini API (用于视觉反馈)
-GEMINI_API_KEY = "your-gemini-api-key"
-
-# 可选: IconFinder API (用于资产下载)
-ICONFINDER_API_KEY = "your-iconfinder-api-key"
+GEMINI_API_KEY=AIza-your-key-here
+GEMINI_VISION_MODEL_NAME=gemini-3-pro-preview
 ```
 
 ## 📖 使用方法
@@ -78,6 +82,20 @@ python -m mathvideo "这张图里的三角形面积如何计算？" --image /pat
 ```bash
 python main.py "勾股定理" --render
 ```
+
+### Web 界面
+
+项目提供了 Web 界面，支持实时日志和可视化操作：
+
+```bash
+# 终端 1 - 启动后端 (端口 8000)
+conda run -n mathvideo python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# 终端 2 - 启动前端 (端口 3000)
+cd frontend && npm install && npm run dev
+```
+
+访问 http://localhost:3000 使用 Web 界面。API 文档: http://localhost:8000/docs
 
 ### 输出结构
 
@@ -207,9 +225,23 @@ mark = self.add_right_angle_mark(polygon, vertex_index=1)
 | `GEMINI_VISION_MODEL_NAME` | Gemini 视觉模型名称 | `gemini-3-pro-preview` |
 | `ICONFINDER_API_KEY` | IconFinder API 密钥 | 可选 |
 
-## 📚 相关项目
+## 🌐 Web 架构
 
-本项目参考了 [Code2Video](https://github.com/example/code2video) 的部分设计理念。
+```
+┌─────────────────┐      ┌─────────────────┐
+│   Next.js 前端   │◄────►│  FastAPI 后端    │
+│   (端口 3000)    │ API  │   (端口 8000)    │
+└─────────────────┘      └────────┬────────┘
+                                  │
+                         ┌────────▼────────┐
+                         │  mathvideo 核心  │
+                         │   (CLI 模块)     │
+                         └─────────────────┘
+```
+
+- **WebSocket 实时日志**: `ws://localhost:8000/api/generate/ws/{task_id}`
+- **静态文件服务**: 后端挂载 `output/` 为 `/static/`
+- **前端代理**: Next.js 代理 `/api/*` 到后端
 
 ## 📄 License
 

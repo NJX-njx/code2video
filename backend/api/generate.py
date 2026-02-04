@@ -108,26 +108,44 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         render: 是否渲染视频
     """
     try:
+        # 等待 WebSocket 连接建立（最多等待 5 秒）
+        # 这解决了前端收到响应后才建立 WebSocket 连接的竞态条件
+        for _ in range(50):  # 50 * 100ms = 5 秒
+            if task_id in active_connections and len(active_connections[task_id]) > 0:
+                break
+            await asyncio.sleep(0.1)
+        
+        # 额外等待一小段时间确保连接稳定
+        await asyncio.sleep(0.2)
+        
         await broadcast_status(task_id, "running")
         await broadcast_log(task_id, f"🚀 开始生成项目: {prompt or '（仅图片输入）'}")
         
-        # 构建命令（使用包入口，避免依赖根目录脚本）
-        cmd = [sys.executable, "-m", "mathvideo"]
+        # 构建命令参数
+        args = []
         if prompt:
-            cmd.append(prompt)
+            args.append(f'"{prompt}"')
         for img_path in (image_paths or []):
-            cmd.extend(["--image", img_path])
+            args.extend(["--image", f'"{img_path}"'])
         if render:
-            cmd.append("--render")
+            args.append("--render")
+        
+        args_str = " ".join(args)
+        
+        # 使用 shell 命令确保 conda 环境和实时输出
+        # PYTHONUNBUFFERED=1 确保输出不被缓冲
+        shell_cmd = f'conda run -n mathvideo --no-capture-output python -u -m mathvideo {args_str}'
         
         await broadcast_log(task_id, f"📂 输出目录: output/{task_id}")
         
         # 使用 subprocess 执行，实时读取输出
         env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"  # 禁用 Python 输出缓冲
         existing_pythonpath = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = PROJECT_ROOT + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
+        
+        process = await asyncio.create_subprocess_shell(
+            shell_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=PROJECT_ROOT,

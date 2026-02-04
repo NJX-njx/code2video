@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mathvideo"
+version = "1.0.0"
+description = "自动化数学视频生成器 - 使用 LLM 和 Manim 生成教学视频"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "MathVideo Team"}
+]
+dependencies = [
+    "manim>=0.18.0",
+    "langchain>=0.1.0",
+    "langchain-openai>=0.0.5",
+    "langchain-anthropic>=0.1.0",
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+    "python-slugify>=8.0.0",
+    "python-dotenv>=1.0.0",
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "requests>=2.31.0",
+    "json5>=0.9.0",
+]
+
+[project.scripts]
+mathvideo = "mathvideo.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mathvideo*"]

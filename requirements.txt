@@ -15,5 +15,11 @@ numpy>=1.24.0
 # HTTP Requests (Asset Manager)
 requests>=2.31.0
 
-# Optional: For better JSON handling
+# JSON handling
 json5>=0.9.0
+
+# Web Backend (FastAPI)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+websockets>=12.0

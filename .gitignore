@@ -13,6 +13,9 @@ __pycache__/
 .venv/
 venv/
 ENV/
+*.egg-info/
+dist/
+build/
 
 # IDE
 .idea/
@@ -23,6 +26,13 @@ ENV/
 # Output（生成的视频与中间产物）
 output/
 
+# Manim media cache
+media/
+
 # Frontend
 frontend/node_modules/
 frontend/.next/
+frontend/.turbo/
+
+# Logs
+*.log

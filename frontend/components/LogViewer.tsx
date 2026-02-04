@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 interface LogMessage {
   level: 'info' | 'success' | 'warning' | 'error';
@@ -15,9 +15,22 @@ interface LogViewerProps {
   onStatusChange: (status: 'idle' | 'running' | 'completed' | 'failed') => void;
 }
 
+// 生成 WebSocket 基础地址
+function getWebSocketBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.hostname || 'localhost';
+    return `${protocol}://${host}:8000`;
+  }
+  return 'ws://localhost:8000';
+}
+
 export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
+  // 用于追踪当前连接的 taskId，防止 StrictMode 重复连接
+  const connectedTaskIdRef = useRef<string | null>(null);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -26,62 +39,90 @@ export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogVi
     }
   }, [logs]);
 
+  // 稳定化回调
+  const onLogRef = useRef(onLog);
+  const onStatusChangeRef = useRef(onStatusChange);
+  useEffect(() => {
+    onLogRef.current = onLog;
+    onStatusChangeRef.current = onStatusChange;
+  }, [onLog, onStatusChange]);
+
   // WebSocket 连接
   useEffect(() => {
     if (!taskId) return;
 
-    // 连接 WebSocket
-    const wsUrl = `ws://localhost:8000/api/generate/ws/${taskId}`;
+    // 如果已经为这个 taskId 建立了连接，跳过（解决 StrictMode 双重挂载问题）
+    if (connectedTaskIdRef.current === taskId && wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+      return;
+    }
+
+    // 关闭旧连接（如果有）
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+
+    connectedTaskIdRef.current = taskId;
+
+    const baseUrl = getWebSocketBaseUrl();
+    const wsUrl = `${baseUrl}/api/generate/ws/${taskId}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      onLog('info', '📡 已连接到服务器，等待日志...');
+      onLogRef.current('info', '📡 已连接到服务器，等待日志...');
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
         if (data.type === 'log') {
-          onLog(data.level || 'info', data.message);
+          onLogRef.current(data.level || 'info', data.message);
         } else if (data.type === 'status') {
-          onStatusChange(data.status);
+          onStatusChangeRef.current(data.status);
           if (data.status === 'completed') {
-            onLog('success', '🎉 所有任务已完成！');
+            onLogRef.current('success', '🎉 所有任务已完成！');
           } else if (data.status === 'failed') {
-            onLog('error', `💥 任务失败: ${data.data?.error || '未知错误'}`);
+            onLogRef.current('error', `💥 任务失败: ${data.data?.error || '未知错误'}`);
           }
-        } else if (data.type === 'connected') {
-          // 已连接消息，忽略
-        } else if (data.type === 'heartbeat' || data.type === 'pong') {
-          // 心跳消息，忽略
         }
+        // connected / heartbeat / pong 消息忽略
       } catch (e) {
-        console.error('解析 WebSocket 消息失败:', e);
+        console.error('Failed to parse WebSocket message:', e);
       }
     };
 
     ws.onerror = () => {
-      onLog('error', '❌ WebSocket 连接错误');
+      onLogRef.current('error', '❌ WebSocket 连接错误');
     };
 
     ws.onclose = () => {
-      onLog('info', '📡 连接已断开');
+      onLogRef.current('info', '📡 连接已断开');
     };
 
     // 心跳保活
-    const heartbeat = setInterval(() => {
+    heartbeatRef.current = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send('ping');
       }
     }, 25000);
 
     return () => {
-      clearInterval(heartbeat);
-      ws.close();
+      // cleanup 时只清理，不再重置 connectedTaskIdRef（避免 StrictMode 再次触发连接）
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
-  }, [taskId, onLog, onStatusChange]);
+  }, [taskId]);
 
   // 获取日志级别对应的样式类
   const getLevelClass = (level: LogMessage['level']) => {
