@@ -68,7 +68,7 @@ def main():
     # 输入校验：至少提供文本或图片
     if not args.prompt.strip() and not args.image:
         print("❌ 请提供文本输入或图片输入（或两者）。")
-        return
+        raise SystemExit(1)
 
     # 生成项目 slug（对长文本做截断+哈希）
     image_hint = ",".join([os.path.basename(p) for p in args.image]) if args.image else None
@@ -119,7 +119,7 @@ def main():
     if not storyboard:
         # 如果生成失败，打印错误信息并退出程序
         print("❌ Failed to generate storyboard.")
-        return
+        raise SystemExit(1)
 
     # 构建故事板JSON文件的保存路径
     storyboard_path = os.path.join(base_output_dir, "storyboard.json")

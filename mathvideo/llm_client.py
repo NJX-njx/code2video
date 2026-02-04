@@ -130,4 +130,6 @@ def get_llm(temperature=0.7):
         - max_tokens设置为8192，Claude支持更大的输出
         - 如果遇到API调用失败，请检查网络连接和API密钥是否有效
     """
+    if not CLAUDE_API_KEY:
+        raise RuntimeError("CLAUDE_API_KEY 未设置，请在 .env 中配置后再运行。")
     return ClaudeDirectChat(temperature=temperature, max_tokens=8192)
