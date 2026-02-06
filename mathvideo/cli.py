@@ -124,7 +124,7 @@ def main():
     # 构建故事板JSON文件的保存路径
     storyboard_path = os.path.join(base_output_dir, "storyboard.json")
     # 以写入模式打开文件，使用UTF-8编码
-    with open(storyboard_path, "w") as f:
+    with open(storyboard_path, "w", encoding="utf-8") as f:
         # 将故事板字典写入JSON文件，使用2个空格缩进，保留中文字符
         json.dump(storyboard, f, indent=2, ensure_ascii=False)
     # 打印成功保存的信息
@@ -138,7 +138,7 @@ def main():
     storyboard = asset_manager.process(storyboard)
 
     # 保存更新后的故事板（包含资产信息）
-    with open(storyboard_path, "w") as f:
+    with open(storyboard_path, "w", encoding="utf-8") as f:
         json.dump(storyboard, f, indent=2, ensure_ascii=False)
     print("✅ Enhanced storyboard saved")
 
@@ -155,7 +155,7 @@ def main():
             # 构建Python脚本文件的保存路径，使用章节ID作为文件名
             filename = os.path.join(scripts_dir, f"{section['id']}.py")
             # 以写入模式打开文件
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding="utf-8") as f:
                 # 将生成的代码写入文件
                 f.write(code)
             # 打印代码保存成功的信息
@@ -214,7 +214,7 @@ def main():
                                     print("🔧 Refining code...")
 
                                     # 读取当前代码
-                                    with open(filename, "r") as f:
+                                    with open(filename, "r", encoding="utf-8") as f:
                                         current_code = f.read()
 
                                     # 调用优化代理
@@ -222,7 +222,7 @@ def main():
 
                                     if refined_code:
                                         # 保存并重试
-                                        with open(filename, "w") as f:
+                                        with open(filename, "w", encoding="utf-8") as f:
                                             f.write(refined_code)
 
                                         print("♻️ Re-rendering refined code...")
@@ -253,7 +253,7 @@ def main():
                             print("🔧 Attempting to self-correct code...")
 
                             # 读取当前出错的代码文件
-                            with open(filename, "r") as f:
+                            with open(filename, "r", encoding="utf-8") as f:
                                 current_code = f.read()
 
                             # 调用LLM修复代码，传入当前代码和错误信息
@@ -262,7 +262,7 @@ def main():
                             # 检查是否成功生成修复后的代码
                             if fixed_code:
                                 # 将修复后的代码写回文件
-                                with open(filename, "w") as f:
+                                with open(filename, "w", encoding="utf-8") as f:
                                     f.write(fixed_code)
                                 # 打印修复成功信息，准备重试
                                 print(f"📝 Fixed code saved to {filename}. Retrying...")
