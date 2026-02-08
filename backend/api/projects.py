@@ -197,13 +197,14 @@ async def list_videos(slug: str):
                 # 构建相对于 output 目录的路径
                 full_path = os.path.join(root, f)
                 rel_path = os.path.relpath(full_path, OUTPUT_DIR)
+                url_path = rel_path.replace(os.sep, "/")
                 # 提取 section 信息
                 parts = rel_path.split(os.sep)
                 section_name = parts[2] if len(parts) > 2 else "unknown"
                 videos.append({
                     "name": f,
                     "section": section_name,
-                    "path": f"/static/{rel_path}",
+                    "path": f"/static/{url_path}",
                     "full_path": rel_path
                 })
     
