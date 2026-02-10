@@ -1,0 +1,74 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicehash/tauri/refs/heads/dev/crates/tauri-config-schema/schema.json",
+  "productName": "MathVideo",
+  "version": "0.1.0",
+  "identifier": "com.mathvideo.app",
+  "build": {
+    "frontendDist": "../out",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "title": "MathVideo AI",
+    "windows": [
+      {
+        "label": "main",
+        "title": "MathVideo AI",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "decorations": true,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' http://localhost:8000 ws://localhost:8000; media-src 'self' http://localhost:8000"
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true,
+      "scope": [
+        {
+          "name": "conda-run",
+          "cmd": "conda",
+          "args": [
+            "run",
+            "-n",
+            "mathvideo",
+            "--no-banner",
+            { "validator": ".*" }
+          ]
+        },
+        {
+          "name": "python-module",
+          "cmd": "conda",
+          "args": [
+            "run",
+            "-n",
+            "mathvideo",
+            "--no-banner",
+            "python",
+            "-u",
+            "-m",
+            { "validator": ".*" }
+          ]
+        },
+        {
+          "name": "conda-check",
+          "cmd": "conda",
+          "args": ["info", "--envs", "--json"]
+        },
+        {
+          "name": "ffmpeg-check",
+          "cmd": "ffmpeg",
+          "args": ["-version"]
+        }
+      ]
+    }
+  }
+}
