@@ -1,19 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
-
-interface Section {
-  id: string;
-  title: string;
-  lecture_lines: string[];
-  animations: string[];
-}
-
-interface Storyboard {
-  topic: string;
-  sections: Section[];
-}
+import { Save, RotateCcw, Plus, Trash2, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import type { Storyboard } from '@/lib/types';
 
 interface StoryboardEditorProps {
   storyboard: Storyboard;
@@ -27,281 +20,212 @@ export default function StoryboardEditor({ storyboard: initialStoryboard, slug, 
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // 切换章节展开/折叠
   const toggleSection = (id: string) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedSections(newExpanded);
+    const next = new Set(expandedSections);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setExpandedSections(next);
   };
 
-  // 更新主题
   const updateTopic = (topic: string) => {
     setStoryboard({ ...storyboard, topic });
     setHasChanges(true);
   };
 
-  // 更新章节标题
   const updateSectionTitle = (id: string, title: string) => {
     setStoryboard({
       ...storyboard,
-      sections: storyboard.sections.map(s =>
-        s.id === id ? { ...s, title } : s
-      ),
+      sections: storyboard.sections.map(s => s.id === id ? { ...s, title } : s),
     });
     setHasChanges(true);
   };
 
-  // 更新讲义笔记
   const updateLectureLine = (sectionId: string, index: number, value: string) => {
     setStoryboard({
       ...storyboard,
       sections: storyboard.sections.map(s =>
         s.id === sectionId
-          ? {
-              ...s,
-              lecture_lines: s.lecture_lines.map((l, i) => (i === index ? value : l)),
-            }
+          ? { ...s, lecture_lines: s.lecture_lines.map((l, i) => (i === index ? value : l)) }
           : s
       ),
     });
     setHasChanges(true);
   };
 
-  // 添加讲义笔记
   const addLectureLine = (sectionId: string) => {
     setStoryboard({
       ...storyboard,
       sections: storyboard.sections.map(s =>
-        s.id === sectionId
-          ? { ...s, lecture_lines: [...s.lecture_lines, ''] }
-          : s
+        s.id === sectionId ? { ...s, lecture_lines: [...s.lecture_lines, ''] } : s
       ),
     });
     setHasChanges(true);
   };
 
-  // 删除讲义笔记
   const removeLectureLine = (sectionId: string, index: number) => {
     setStoryboard({
       ...storyboard,
       sections: storyboard.sections.map(s =>
-        s.id === sectionId
-          ? { ...s, lecture_lines: s.lecture_lines.filter((_, i) => i !== index) }
-          : s
+        s.id === sectionId ? { ...s, lecture_lines: s.lecture_lines.filter((_, i) => i !== index) } : s
       ),
     });
     setHasChanges(true);
   };
 
-  // 更新动画描述
   const updateAnimation = (sectionId: string, index: number, value: string) => {
     setStoryboard({
       ...storyboard,
       sections: storyboard.sections.map(s =>
         s.id === sectionId
-          ? {
-              ...s,
-              animations: s.animations.map((a, i) => (i === index ? value : a)),
-            }
+          ? { ...s, animations: s.animations.map((a, i) => (i === index ? value : a)) }
           : s
       ),
     });
     setHasChanges(true);
   };
 
-  // 添加动画描述
   const addAnimation = (sectionId: string) => {
     setStoryboard({
       ...storyboard,
       sections: storyboard.sections.map(s =>
-        s.id === sectionId
-          ? { ...s, animations: [...s.animations, ''] }
-          : s
+        s.id === sectionId ? { ...s, animations: [...s.animations, ''] } : s
       ),
     });
     setHasChanges(true);
   };
 
-  // 删除动画描述
   const removeAnimation = (sectionId: string, index: number) => {
     setStoryboard({
       ...storyboard,
       sections: storyboard.sections.map(s =>
-        s.id === sectionId
-          ? { ...s, animations: s.animations.filter((_, i) => i !== index) }
-          : s
+        s.id === sectionId ? { ...s, animations: s.animations.filter((_, i) => i !== index) } : s
       ),
     });
     setHasChanges(true);
   };
 
-  // 添加新章节
   const addSection = () => {
     const newId = `section_${storyboard.sections.length + 1}`;
     setStoryboard({
       ...storyboard,
-      sections: [
-        ...storyboard.sections,
-        {
-          id: newId,
-          title: '新章节',
-          lecture_lines: [''],
-          animations: [''],
-        },
-      ],
+      sections: [...storyboard.sections, { id: newId, title: '新章节', lecture_lines: [''], animations: [''] }],
     });
     setExpandedSections(new Set([...expandedSections, newId]));
     setHasChanges(true);
   };
 
-  // 删除章节
   const removeSection = (id: string) => {
-    if (!confirm('确定要删除这个章节吗？')) return;
-    setStoryboard({
-      ...storyboard,
-      sections: storyboard.sections.filter(s => s.id !== id),
-    });
+    setStoryboard({ ...storyboard, sections: storyboard.sections.filter(s => s.id !== id) });
     setHasChanges(true);
   };
 
-  // 保存
   const handleSave = async () => {
     setSaving(true);
-    try {
-      await onSave(storyboard);
-      setHasChanges(false);
-    } catch (error) {
-      alert('保存失败: ' + (error instanceof Error ? error.message : '未知错误'));
-    } finally {
-      setSaving(false);
-    }
+    try { await onSave(storyboard); setHasChanges(false); }
+    catch (e) { alert('保存失败: ' + (e instanceof Error ? e.message : '未知错误')); }
+    finally { setSaving(false); }
   };
 
-  // 重置
   const handleReset = () => {
-    if (!confirm('确定要放弃所有更改吗？')) return;
     setStoryboard(initialStoryboard);
     setHasChanges(false);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 工具栏 */}
-      <div className="flex items-center justify-between bg-manim-surface rounded-xl p-4">
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-400">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">
             {storyboard.sections.length} 个章节
           </span>
           {hasChanges && (
-            <span className="text-sm text-manim-warning">● 有未保存的更改</span>
+            <Badge variant="warning" className="text-xs">未保存</Badge>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleReset}
-            disabled={!hasChanges || saving}
-            className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-white hover:bg-manim-bg rounded-lg disabled:opacity-50 transition-colors"
-          >
-            <RotateCcw size={16} />
+          <Button variant="ghost" size="sm" onClick={handleReset} disabled={!hasChanges || saving}>
+            <RotateCcw className="h-4 w-4 mr-1.5" />
             重置
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!hasChanges || saving}
-            className="flex items-center gap-2 px-4 py-2 bg-manim-accent text-manim-bg rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
-          >
-            <Save size={16} />
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={!hasChanges || saving}>
+            <Save className="h-4 w-4 mr-1.5" />
             {saving ? '保存中...' : '保存'}
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* 主题编辑 */}
-      <div className="bg-manim-surface rounded-xl p-4">
-        <label className="block text-sm font-medium mb-2">主题</label>
-        <input
-          type="text"
-          value={storyboard.topic}
-          onChange={(e) => updateTopic(e.target.value)}
-          className="w-full px-4 py-2 bg-manim-bg border border-gray-700 rounded-lg focus:outline-none focus:border-manim-accent"
-        />
-      </div>
+      {/* 主题 */}
+      <Card>
+        <CardContent className="p-4">
+          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">主题</label>
+          <Input value={storyboard.topic} onChange={(e) => updateTopic(e.target.value)} />
+        </CardContent>
+      </Card>
 
       {/* 章节列表 */}
-      <div className="space-y-4">
-        {storyboard.sections.map((section, sectionIndex) => (
-          <div key={section.id} className="bg-manim-surface rounded-xl overflow-hidden">
-            {/* 章节头部 */}
+      <div className="space-y-3">
+        {storyboard.sections.map((section, sIdx) => (
+          <Card key={section.id}>
+            {/* 章节头 */}
             <div
-              className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-700/50"
+              className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/50 transition-colors rounded-t-xl"
               onClick={() => toggleSection(section.id)}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
+                <GripVertical className="h-4 w-4 text-muted-foreground/50" />
                 {expandedSections.has(section.id) ? (
-                  <ChevronUp size={20} />
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <ChevronDown size={20} />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 )}
-                <span className="text-sm text-gray-400">#{sectionIndex + 1}</span>
+                <Badge variant="outline" className="text-xs font-mono">
+                  {sIdx + 1}
+                </Badge>
                 <span className="font-medium">{section.title}</span>
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeSection(section.id);
-                }}
-                className="p-2 text-gray-400 hover:text-manim-error hover:bg-red-900/30 rounded-lg transition-colors"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}
               >
-                <Trash2 size={16} />
-              </button>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             </div>
 
             {/* 章节内容 */}
             {expandedSections.has(section.id) && (
-              <div className="p-4 pt-0 space-y-4 border-t border-gray-700">
-                {/* 标题 */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">标题</label>
-                  <input
-                    type="text"
+              <CardContent className="pt-0 pb-4 space-y-4 border-t border-border">
+                <div className="pt-4">
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">标题</label>
+                  <Input
                     value={section.title}
                     onChange={(e) => updateSectionTitle(section.id, e.target.value)}
-                    className="w-full px-4 py-2 bg-manim-bg border border-gray-700 rounded-lg focus:outline-none focus:border-manim-accent"
                   />
                 </div>
 
                 {/* 讲义笔记 */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium">讲义笔记</label>
-                    <button
-                      onClick={() => addLectureLine(section.id)}
-                      className="flex items-center gap-1 text-sm text-manim-accent hover:underline"
-                    >
-                      <Plus size={14} />
+                    <label className="text-xs font-medium text-muted-foreground">讲义笔记</label>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => addLectureLine(section.id)}>
+                      <Plus className="h-3 w-3 mr-1" />
                       添加
-                    </button>
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    {section.lecture_lines.map((line, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
+                  <div className="space-y-1.5">
+                    {section.lecture_lines.map((line, i) => (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <Input
                           value={line}
-                          onChange={(e) => updateLectureLine(section.id, index, e.target.value)}
-                          placeholder={`笔记 ${index + 1}`}
-                          className="flex-1 px-4 py-2 bg-manim-bg border border-gray-700 rounded-lg focus:outline-none focus:border-manim-accent"
+                          onChange={(e) => updateLectureLine(section.id, i, e.target.value)}
+                          placeholder={`笔记 ${i + 1}`}
+                          className="h-9 text-sm"
                         />
-                        <button
-                          onClick={() => removeLectureLine(section.id, index)}
-                          className="p-2 text-gray-400 hover:text-manim-error transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeLectureLine(section.id, i)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -310,47 +234,41 @@ export default function StoryboardEditor({ storyboard: initialStoryboard, slug, 
                 {/* 动画描述 */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium">动画描述</label>
-                    <button
-                      onClick={() => addAnimation(section.id)}
-                      className="flex items-center gap-1 text-sm text-manim-accent hover:underline"
-                    >
-                      <Plus size={14} />
+                    <label className="text-xs font-medium text-muted-foreground">动画描述</label>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => addAnimation(section.id)}>
+                      <Plus className="h-3 w-3 mr-1" />
                       添加
-                    </button>
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    {section.animations.map((anim, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
+                  <div className="space-y-1.5">
+                    {section.animations.map((anim, i) => (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <Input
                           value={anim}
-                          onChange={(e) => updateAnimation(section.id, index, e.target.value)}
-                          placeholder={`动画 ${index + 1}`}
-                          className="flex-1 px-4 py-2 bg-manim-bg border border-gray-700 rounded-lg focus:outline-none focus:border-manim-accent"
+                          onChange={(e) => updateAnimation(section.id, i, e.target.value)}
+                          placeholder={`动画 ${i + 1}`}
+                          className="h-9 text-sm"
                         />
-                        <button
-                          onClick={() => removeAnimation(section.id, index)}
-                          className="p-2 text-gray-400 hover:text-manim-error transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeAnimation(section.id, i)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     ))}
                   </div>
                 </div>
-              </div>
+              </CardContent>
             )}
-          </div>
+          </Card>
         ))}
       </div>
 
-      {/* 添加章节按钮 */}
+      {/* 添加章节 */}
       <button
         onClick={addSection}
-        className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-600 rounded-xl text-gray-400 hover:text-white hover:border-manim-accent transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-border rounded-xl text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
       >
-        <Plus size={20} />
+        <Plus className="h-5 w-5" />
         添加新章节
       </button>
     </div>

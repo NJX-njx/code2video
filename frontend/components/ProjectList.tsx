@@ -1,170 +1,185 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trash2, Play, FolderOpen, Video, FileCode } from 'lucide-react';
+import { Trash2, Play, FolderOpen, Video, FileCode, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-
-interface Project {
-  slug: string;
-  topic: string;
-  created_at: string | null;
-  sections_count: number;
-  has_videos: boolean;
-}
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { getProjects, deleteProject } from '@/lib/api';
+import type { Project } from '@/lib/types';
 
 export default function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
 
-  // 加载项目列表
   const loadProjects = async () => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await fetch('/api/projects/');
-      if (!response.ok) {
-        throw new Error('加载项目列表失败');
-      }
-      const data = await response.json();
+      const data = await getProjects();
       setProjects(data.projects);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '未知错误');
+      setError(err instanceof Error ? err.message : '加载失败');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  useEffect(() => { loadProjects(); }, []);
 
-  // 删除项目
-  const handleDelete = async (slug: string) => {
-    if (!confirm(`确定要删除项目 "${slug}" 吗？此操作不可撤销。`)) {
-      return;
-    }
-
+  const handleDelete = async () => {
+    if (!deleteSlug) return;
     try {
-      const response = await fetch(`/api/projects/${slug}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('删除失败');
-      }
-      
-      // 重新加载列表
+      await deleteProject(deleteSlug);
+      setDeleteSlug(null);
       loadProjects();
     } catch (err) {
       alert(err instanceof Error ? err.message : '删除失败');
     }
   };
 
-  // 格式化日期
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '未知';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Date(dateStr).toLocaleDateString('zh-CN', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
     });
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-2 border-manim-accent border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-5 w-24" />
+        </div>
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-64" />
+                </div>
+                <Skeleton className="h-9 w-9 rounded-lg" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-900/30 border border-red-500/50 rounded-xl p-6 text-center">
-        <p className="text-manim-error mb-4">{error}</p>
-        <button
-          onClick={loadProjects}
-          className="px-4 py-2 bg-manim-surface rounded-lg hover:bg-gray-700"
-        >
-          重试
-        </button>
-      </div>
+      <Card className="border-destructive/50">
+        <CardContent className="p-8 text-center">
+          <p className="text-destructive mb-4">{error}</p>
+          <Button variant="outline" onClick={loadProjects}>重试</Button>
+        </CardContent>
+      </Card>
     );
   }
 
   if (projects.length === 0) {
     return (
-      <div className="bg-manim-surface rounded-xl p-12 text-center">
-        <FolderOpen size={48} className="mx-auto mb-4 text-gray-500" />
-        <h3 className="text-xl font-semibold mb-2">暂无项目</h3>
-        <p className="text-gray-400">
-          开始生成你的第一个数学视频吧！
-        </p>
-      </div>
+      <Card>
+        <CardContent className="p-12 text-center">
+          <FolderOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-xl font-semibold mb-2">暂无项目</h3>
+          <p className="text-muted-foreground">开始生成你的第一个数学视频吧</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">项目列表</h2>
-        <span className="text-gray-400">共 {projects.length} 个项目</span>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-2xl font-bold tracking-tight">项目列表</h2>
+        <span className="text-sm text-muted-foreground">{projects.length} 个项目</span>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-3">
         {projects.map((project) => (
-          <div
-            key={project.slug}
-            className="bg-manim-surface rounded-xl p-6 hover:bg-gray-700/50 transition-colors"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <Link 
-                  href={`/projects/${project.slug}`}
-                  className="text-xl font-semibold text-manim-accent hover:underline"
-                >
-                  {project.topic}
-                </Link>
-                <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <FileCode size={14} />
-                    {project.sections_count} 个章节
-                  </span>
-                  {project.has_videos && (
-                    <span className="flex items-center gap-1 text-manim-success">
-                      <Video size={14} />
-                      已渲染
+          <Card key={project.slug} className="group">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <Link
+                    href={`/projects/${project.slug}`}
+                    className="text-lg font-semibold hover:text-primary transition-colors"
+                  >
+                    {project.topic}
+                  </Link>
+                  <div className="flex items-center gap-3 mt-1.5 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <FileCode className="h-3.5 w-3.5" />
+                      {project.sections_count} 个章节
                     </span>
-                  )}
-                  <span>{formatDate(project.created_at)}</span>
+                    {project.has_videos ? (
+                      <Badge variant="success" className="text-xs">
+                        <Video className="h-3 w-3 mr-1" />
+                        已渲染
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">待渲染</Badge>
+                    )}
+                    <span>{formatDate(project.created_at)}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link href={`/projects/${project.slug}`}>
+                      <Play className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => setDeleteSlug(project.slug)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/projects/${project.slug}`}
-                  className="p-2 hover:bg-manim-bg rounded-lg transition-colors"
-                  title="查看详情"
-                >
-                  <Play size={18} />
-                </Link>
-                <button
-                  onClick={() => handleDelete(project.slug)}
-                  className="p-2 hover:bg-red-900/50 rounded-lg transition-colors text-gray-400 hover:text-manim-error"
-                  title="删除项目"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
+
+      {/* 删除确认弹窗 */}
+      <Dialog open={!!deleteSlug} onOpenChange={(open) => !open && setDeleteSlug(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              确认删除
+            </DialogTitle>
+            <DialogDescription>
+              确定要删除项目 "{deleteSlug}" 吗？此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteSlug(null)}>取消</Button>
+            <Button variant="destructive" onClick={handleDelete}>删除</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
