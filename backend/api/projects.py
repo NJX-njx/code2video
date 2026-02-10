@@ -192,6 +192,9 @@ async def list_videos(slug: str):
     
     videos = []
     for root, dirs, files in os.walk(videos_dir):
+        # 跳过 Manim 的 partial_movie_files 中间文件目录
+        if "partial_movie_files" in root:
+            continue
         for f in files:
             if f.endswith(".mp4"):
                 # 构建相对于 output 目录的路径
@@ -199,8 +202,10 @@ async def list_videos(slug: str):
                 rel_path = os.path.relpath(full_path, OUTPUT_DIR)
                 url_path = rel_path.replace(os.sep, "/")
                 # 提取 section 信息
+                # rel_path 格式: slug/media/videos/section_X/480p15/ClassName.mp4
+                # parts[0]=slug, [1]=media, [2]=videos, [3]=section_X
                 parts = rel_path.split(os.sep)
-                section_name = parts[2] if len(parts) > 2 else "unknown"
+                section_name = parts[3] if len(parts) > 3 else "unknown"
                 videos.append({
                     "name": f,
                     "section": section_name,

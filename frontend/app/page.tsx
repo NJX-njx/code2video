@@ -143,7 +143,7 @@ export default function Home() {
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>MathVideo — AI 驱动的数学教学视频生成器</span>
                   <div className="flex items-center gap-4">
-                    <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
+                    <a href="https://github.com/NJX-njx/code2video" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
                     <a href="/api/docs" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">API 文档</a>
                   </div>
                 </div>
