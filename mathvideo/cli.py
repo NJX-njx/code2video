@@ -340,10 +340,10 @@ def main():
 
 def _merge_videos(video_paths: list, output_dir: str) -> str:
     """
-    使用 ffmpeg 将多个分镜视频合并为一个完整视频。
+    将多个分镜视频合并为一个完整视频。
 
-    使用 ffmpeg 的 concat demuxer 模式，将相同编码的视频快速拼接。
-    如果 ffmpeg 不可用，回退为返回 None。
+    优先使用 PyAV（Manim 已安装的依赖）的 concat 模式进行快速拼接。
+    如果 PyAV 不可用，回退尝试 CLI ffmpeg。
 
     参数:
         video_paths: 按顺序排列的视频文件路径列表
@@ -353,37 +353,86 @@ def _merge_videos(video_paths: list, output_dir: str) -> str:
         str: 合并后的视频文件路径，或失败时返回 None
     """
     import shutil
+    from pathlib import Path
 
     final_path = os.path.join(output_dir, "final_video.mp4")
 
-    # 检查 ffmpeg 是否可用
+    # 方式1: 使用 PyAV（Manim 的 ffmpeg 绑定），与 Manim 自身的合并方式一致
+    try:
+        import av
+
+        # 创建 concat 文件列表（与 Manim 的 combine_files 格式一致）
+        concat_list_path = os.path.join(output_dir, "_concat_list.txt")
+        with open(concat_list_path, "w", encoding="utf-8") as f:
+            f.write("# This file is used internally for video concatenation.\n")
+            for vp in video_paths:
+                posix_path = Path(vp).resolve().as_posix()
+                f.write(f"file 'file:{posix_path}'\n")
+
+        # 使用 PyAV 的 concat demuxer 读取所有分镜
+        input_container = av.open(
+            str(concat_list_path),
+            options={"safe": "0", "an": "1"},
+            format="concat",
+        )
+        input_stream = input_container.streams.video[0]
+
+        # 创建输出容器，使用与输入相同的编码参数
+        output_container = av.open(final_path, mode="w")
+        output_stream = output_container.add_stream(
+            input_stream.codec_context.name,
+            rate=input_stream.average_rate,
+        )
+        output_stream.width = input_stream.codec_context.width
+        output_stream.height = input_stream.codec_context.height
+        output_stream.pix_fmt = input_stream.codec_context.pix_fmt
+
+        # 解码所有帧并重新编码到输出（确保时间戳连续）
+        for frame in input_container.decode(video=0):
+            for packet in output_stream.encode(frame):
+                output_container.mux(packet)
+
+        # 刷新编码器缓冲
+        for packet in output_stream.encode():
+            output_container.mux(packet)
+
+        output_container.close()
+        input_container.close()
+
+        # 清理临时文件
+        os.remove(concat_list_path)
+
+        if os.path.exists(final_path):
+            return final_path
+
+    except ImportError:
+        print("⚠️ PyAV 未安装，尝试使用 CLI ffmpeg...")
+    except Exception as e:
+        print(f"⚠️ PyAV 合并失败: {e}，尝试使用 CLI ffmpeg...")
+
+    # 方式2: 回退到 CLI ffmpeg
     ffmpeg_cmd = shutil.which("ffmpeg")
     if not ffmpeg_cmd:
         print("⚠️ ffmpeg 未找到，无法合并视频")
         return None
 
-    # 创建 ffmpeg concat 文件列表
     concat_list_path = os.path.join(output_dir, "_concat_list.txt")
     try:
         with open(concat_list_path, "w", encoding="utf-8") as f:
             for vp in video_paths:
-                # ffmpeg concat demuxer 需要绝对路径，用单引号包裹并转义反斜杠
                 abs_path = os.path.abspath(vp).replace("\\", "/")
                 f.write(f"file '{abs_path}'\n")
 
-        # 执行 ffmpeg 合并
-        import sys
         cmd = [
             ffmpeg_cmd, "-y",
             "-f", "concat", "-safe", "0",
             "-i", concat_list_path,
-            "-c", "copy",  # 直接复制流，不重新编码，速度极快
+            "-c", "copy",
             final_path
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode == 0 and os.path.exists(final_path):
-            # 清理临时文件
             os.remove(concat_list_path)
             return final_path
         else:

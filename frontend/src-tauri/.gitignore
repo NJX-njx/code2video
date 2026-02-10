@@ -1,0 +1,4 @@
+# Tauri build 产物
+target/
+# Tauri 生成的图标（仅保留源文件 icon.png）
+icons/!(icon.png)
