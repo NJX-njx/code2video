@@ -174,6 +174,7 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         # 使用 subprocess 执行，实时读取输出
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"  # 禁用 Python 输出缓冲
+        env["PYTHONIOENCODING"] = "utf-8"  # 强制子进程使用 UTF-8 编码输出
         existing_pythonpath = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = PROJECT_ROOT + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
         
@@ -191,7 +192,7 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
             if not line:
                 break
             
-            decoded_line = line.decode("utf-8").strip()
+            decoded_line = line.decode("utf-8", errors="replace").strip()
             if decoded_line:
                 # 根据内容判断日志级别
                 level = "info"
@@ -480,7 +481,7 @@ async def regenerate_section(slug: str, section_id: str):
             return {
                 "success": False,
                 "message": f"章节 '{section_id}' 代码已重新生成，但渲染失败",
-                "error": stderr.decode("utf-8")[-500:] if stderr else "未知错误",
+                "error": stderr.decode("utf-8", errors="replace")[-500:] if stderr else "未知错误",
                 "class_name": class_name,
                 "section": section,
             }

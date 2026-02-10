@@ -5,27 +5,36 @@
 ```mermaid
 flowchart TB
     subgraph Input["📥 输入阶段"]
-        A[用户输入数学主题<br/>例如: 勾股定理]
+        A[用户输入数学主题<br/>+ 可选图片]
+    end
+
+    subgraph Routing["🔀 路由阶段"]
+        R[Router Agent<br/>任务类型分类]
+        R1{任务类型}
+        R2[knowledge / problem<br/>独立模式]
+        R3[geometry / proof<br/>递进模式]
     end
 
     subgraph Planning["📋 规划阶段"]
-        B[Planner Agent<br/>分镜规划器]
-        B1[生成 storyboard.json<br/>包含章节、讲义、动画描述]
+        B[Planner Agent<br/>+ Skill 注入]
+        B1[生成 storyboard.json<br/>含 inherited/new objects]
+        B2[项目目录重命名<br/>AI 生成有意义的名称]
     end
 
     subgraph Assets["🖼️ 资产阶段"]
-        C[Asset Manager<br/>资产管理器]
-        C1{有 IconFinder<br/>API Key?}
+        C[Asset Manager]
+        C1{有 IconFinder Key?}
         C2[下载真实图标]
         C3[生成 SVG 占位符]
-        C4[更新 storyboard<br/>添加资产路径]
+        C4[更新 storyboard]
     end
 
     subgraph Generation["⚙️ 生成阶段"]
         D[遍历每个 Section]
-        E[Coder Agent<br/>代码生成器]
-        E1[生成 Manim Python 代码]
-        E2[保存到 scripts/section_N.py]
+        E[Coder Agent<br/>+ Skill 注入]
+        E1[独立模式: CODER_PROMPT]
+        E2[递进模式: CODER_SEQUENTIAL_PROMPT<br/>传入前序代码]
+        E3[保存 scripts/section_N.py]
     end
 
     subgraph Rendering["🎬 渲染阶段"]
@@ -36,37 +45,37 @@ flowchart TB
     end
 
     subgraph Fixing["🔧 修复阶段"]
-        G[Fixer Agent<br/>错误修复器]
-        G1[分析错误信息]
-        G2[生成修复后的代码]
-        G3{重试次数<br/>< 4?}
+        G[Fixer Agent]
+        G1[分析错误 → 修复代码]
+        G2{重试 < 3次?}
     end
 
-    subgraph Critique["👁️ 视觉分析阶段"]
+    subgraph Critique["👁️ 视觉分析"]
         H{启用视觉反馈?}
-        H1[Visual Critic<br/>视觉批评家]
-        H2[FFmpeg 提取关键帧<br/>每秒1帧, 最多4帧]
-        H3[发送到 Gemini 3 Pro<br/>视觉大模型]
-        H4[分析布局、几何正确性]
-        H5{发现问题?}
+        H1[Visual Critic<br/>Gemini → Claude 回退]
+        H2[FFmpeg 提取帧<br/>→ 视觉模型分析]
+        H3{发现问题?}
     end
 
     subgraph Refining["✨ 优化阶段"]
-        I[Refiner Agent<br/>代码优化器]
-        I1[根据视觉反馈修改代码]
-        I2[调整坐标、缩放、颜色]
-        I3[重新渲染]
+        I[Refiner Agent]
+        I1[调整坐标/缩放/颜色<br/>→ 重新渲染]
     end
 
-    subgraph Output["📤 输出阶段"]
-        J[最终视频文件]
-        J1[output/主题/media/videos/]
+    subgraph Merging["🎬 合并阶段"]
+        M[PyAV 视频合并<br/>ffmpeg CLI 回退]
+        M1[final_video.mp4]
     end
 
-    %% 主流程连接
-    A --> B
-    B --> B1
-    B1 --> C
+    %% 主流程
+    A --> R
+    R --> R1
+    R1 --> R2
+    R1 --> R3
+    R2 --> B
+    R3 --> B
+
+    B --> B1 --> B2 --> C
     C --> C1
     C1 -->|是| C2
     C1 -->|否| C3
@@ -76,86 +85,90 @@ flowchart TB
 
     D --> E
     E --> E1
-    E1 --> E2
-    E2 --> F
+    E --> E2
+    E1 --> E3
+    E2 --> E3
+    E3 --> F
     F --> F1
 
     F1 -->|成功| F2
     F1 -->|失败| F3
 
-    F3 --> G
-    G --> G1
-    G1 --> G2
-    G2 --> G3
-    G3 -->|是| F
-    G3 -->|否| J1
+    F3 --> G --> G1 --> G2
+    G2 -->|是| F
+    G2 -->|否| M
 
     F2 --> H
-    H -->|否| J
-    H -->|是| H1
-    H1 --> H2
-    H2 --> H3
-    H3 --> H4
-    H4 --> H5
+    H -->|否| M
+    H -->|是| H1 --> H2 --> H3
+    H3 -->|否| M
+    H3 -->|是| I --> I1 --> M
 
-    H5 -->|否| J
-    H5 -->|是| I
-    I --> I1
-    I1 --> I2
-    I2 --> I3
-    I3 --> J
-
-    J --> J1
-
-    %% 样式
-    classDef input fill:#e1f5fe,stroke:#01579b
-    classDef planning fill:#f3e5f5,stroke:#4a148c
-    classDef assets fill:#fff3e0,stroke:#e65100
-    classDef generation fill:#e8f5e9,stroke:#1b5e20
-    classDef rendering fill:#fce4ec,stroke:#880e4f
-    classDef fixing fill:#fff8e1,stroke:#f57f17
-    classDef critique fill:#e3f2fd,stroke:#0d47a1
-    classDef refining fill:#f1f8e9,stroke:#33691e
-    classDef output fill:#e0f2f1,stroke:#004d40
-
-    class A input
-    class B,B1 planning
-    class C,C1,C2,C3,C4 assets
-    class D,E,E1,E2 generation
-    class F,F1,F2,F3 rendering
-    class G,G1,G2,G3 fixing
-    class H,H1,H2,H3,H4,H5 critique
-    class I,I1,I2,I3 refining
-    class J,J1 output
+    M --> M1
 ```
 
 ## 各阶段详细说明
 
+### 0. 路由阶段 (Router)
+
+> v1.1 新增
+
+**输入**: 用户文本 + 图片描述（如有）
+
+**处理**:
+- 调用 Claude LLM (temperature=0.1)
+- 使用 `ROUTER_PROMPT` 判断任务类型
+- 容错解析：直接匹配 → JSON → 文本搜索 → 中文映射
+
+**输出**: 任务类型 (`knowledge` / `geometry` / `problem` / `proof`)
+
+**Section 模式决策**:
+| 任务类型 | Section 模式 | 说明 |
+|----------|-------------|------|
+| `knowledge` | 独立 | 各节互不依赖 |
+| `problem` | 独立 | 审题→建模→求解独立 |
+| `geometry` | **递进** | 后节继承前节图形 |
+| `proof` | **递进** | 逻辑链逐步推导 |
+
 ### 1. 规划阶段 (Planner)
 
-**输入**: 数学主题字符串 (如 "勾股定理")
+**输入**: 数学主题字符串 + 任务类型 + Skill 注入
 
 **处理**:
 - 调用 Claude LLM
-- 使用 `PLANNER_PROMPT` 模板
+- 按任务类型选择 Prompt: `PLANNER_PROMPT` / `PLANNER_GEOMETRY_PROMPT` / `PLANNER_PROOF_PROMPT`
+- 通过 SkillManager 加载经验技巧追加到 Prompt 末尾
 - 生成结构化的 JSON 分镜脚本
 
 **输出**: `storyboard.json`
 ```json
 {
-  "topic": "勾股定理",
+  "topic": "等边三角形中的对称与交点构造",
+  "task_type": "geometry",
   "sections": [
     {
       "id": "section_1",
-      "title": "直角三角形登场",
-      "lecture_lines": ["直角三角形", "三边命名", "直角 90°"],
-      "animations": ["三角形淡入", "边闪烁标注", "直角标记"]
+      "title": "构造等边三角形 ABC",
+      "lecture_lines": ["等边三角形", "三边相等", "各角 60°"],
+      "animations": ["三角形淡入", "边标注", "角标记"],
+      "inherited_objects": [],
+      "new_objects": ["triangle_ABC", "labels"]
     }
   ]
 }
 ```
 
-### 2. 资产阶段 (Asset Manager)
+### 2. 项目重命名
+
+> v1.1 新增
+
+**触发**: Planner 生成 storyboard 后
+
+**处理**: 用 storyboard 的 AI 生成 `topic` 字段重命名输出目录
+
+**效果**: `已知等边三角形ABC-273bcf` → `等边三角形中的对称与交点构造-75bd10`
+
+### 3. 资产阶段 (Asset Manager)
 
 **输入**: storyboard.json
 
@@ -167,18 +180,21 @@ flowchart TB
 
 **输出**: `assets/` 目录下的图标文件
 
-### 3. 生成阶段 (Coder)
+### 4. 生成阶段 (Coder)
 
-**输入**: 单个 section 数据
+**输入**: 单个 section 数据 + (递进模式) 前序 Section 代码
 
 **处理**:
 - 调用 Claude LLM
-- 使用 `CODER_PROMPT` 模板
+- 按模式选择 Prompt: `CODER_PROMPT`（独立） / `CODER_SEQUENTIAL_PROMPT`（递进）
+- 通过 SkillManager 注入经验技巧
 - 生成继承自 `TeachingScene` 的 Manim 代码
+
+**递进模式关键**: Coder 接收 `previous_code` + `inherited_objects` + `new_objects`，先 `self.add()` 静默重建继承对象，再动画展示新对象。
 
 **输出**: `scripts/section_N.py`
 
-### 4. 渲染阶段 (Manim)
+### 5. 渲染阶段 (Manim)
 
 **输入**: Python 脚本文件
 
@@ -189,29 +205,29 @@ flowchart TB
 
 **输出**: MP4 视频文件 或 错误信息
 
-### 5. 修复阶段 (Fixer)
+### 6. 修复阶段 (Fixer)
 
 **触发条件**: 渲染失败
 
 **输入**: 原始代码 + 错误信息
 
 **处理**:
-- 调用 Claude LLM
+- 调用 Claude LLM (temperature=0.2)
 - 使用 `FIX_CODE_PROMPT` 模板
 - 分析错误并生成修复代码
 
-**输出**: 修复后的代码 (最多重试 4 次)
+**输出**: 修复后的代码 (最多重试 3 次)
 
-### 6. 视觉分析阶段 (Critic)
+### 7. 视觉分析阶段 (Critic)
 
-**触发条件**: 渲染成功 且 `USE_VISUAL_FEEDBACK=True`
+**触发条件**: 渲染成功 且 `USE_VISUAL_FEEDBACK=true`
 
 **输入**: MP4 视频文件
 
 **处理**:
 1. FFmpeg 提取关键帧 (每秒1帧, 最多4帧)
 2. Base64 编码图像
-3. 发送到 Gemini 3 Pro 视觉模型
+3. 发送到 Gemini 3 Pro（优先）/ Claude（回退）视觉模型
 4. 分析布局、几何正确性、文字可读性
 
 **输出**: JSON 反馈
@@ -223,18 +239,49 @@ flowchart TB
 }
 ```
 
-### 7. 优化阶段 (Refiner)
+### 8. 优化阶段 (Refiner)
 
 **触发条件**: Critic 发现问题
 
 **输入**: 原始代码 + 视觉反馈建议
 
 **处理**:
-- 调用 Claude LLM
+- 调用 Claude LLM (temperature=0.3)
 - 使用 `REFINE_CODE_PROMPT` 模板
 - 仅调整视觉参数,不改变逻辑
 
 **输出**: 优化后的代码 → 重新渲染
+
+### 9. 视频合并
+
+> v1.1 新增
+
+**触发条件**: 有 2 个以上分镜渲染成功
+
+**处理**:
+- 主方案: PyAV (Manim 内置依赖) concat demuxer + decode/encode
+- 回退方案: CLI ffmpeg `-c copy`
+
+**输出**: `final_video.mp4`
+
+## Skill 注入系统
+
+> v1.1 新增
+
+### 工作原理
+
+```
+mathvideo/skills/
+├── common/          ← 所有类型共用的最佳实践
+├── geometry/        ← 几何构造专用技巧
+├── knowledge/       ← 知识点讲解专用（待扩充）
+├── problem/         ← 应用/计算题专用（待扩充）
+└── proof/           ← 证明推导专用技巧
+```
+
+`load_skills("geometry")` → 加载 `common/` + `geometry/` 目录下所有 `.md` 文件 → 拼接为文本 → 追加到 Planner 和 Coder 的 Prompt 末尾。
+
+**扩展方式**: 在对应目录下新建 `.md` 文件即可自动生效，无需修改代码。
 
 ## 关键技术点
 
@@ -243,7 +290,7 @@ flowchart TB
 ```
 屏幕分割:
 ┌─────────────────┬──────────────────────────────────┐
-│   左侧 (讲义)    │         右侧 (10x10 网格)          │
+│   左侧 (讲义)    │         右侧 (10×10 网格)          │
 │                 │  A1  A2  A3  ...  A10            │
 │  • 标题          │  B1  B2  B3  ...  B10            │
 │  • 笔记 1        │  ...                             │

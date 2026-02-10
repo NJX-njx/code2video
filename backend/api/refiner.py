@@ -261,9 +261,17 @@ async def render_section(slug: str, section_id: str):
     class_name = class_match.group(1)
     media_dir = os.path.join(OUTPUT_DIR, slug, "media")
     
-    # 执行渲染
+    # 执行渲染（使用与 generate.py 一致的环境检测）
+    import sys
+    # 查找正确的 Python 可执行文件
+    if sys.platform == "win32":
+        venv_python = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe")
+    else:
+        venv_python = os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
+    python_exe = venv_python if os.path.isfile(venv_python) else sys.executable
+    
     cmd = [
-        sys.executable, "-m", "manim", "-ql",
+        python_exe, "-m", "manim", "-ql",
         "--media_dir", media_dir,
         script_path, class_name
     ]

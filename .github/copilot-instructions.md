@@ -6,7 +6,7 @@
 
 ### Pipeline
 ```
-用户输入 → Router → Planner(按类型) → AssetManager → Coder(按模式) → Manim渲染 → [Critic] → [Refiner] → 视频
+用户输入 → Router → Planner(按类型) → AssetManager → Coder(按模式) → Manim渲染 → [Critic] → [Refiner] → 视频合并 → 最终视频
 ```
 
 | Agent | 文件 | 模型 | 职责 |
@@ -47,7 +47,8 @@ output/<topic_slug>/
 ├── inputs/              # 用户上传的图片副本
 ├── assets/              # SVG 图标（AssetManager）
 ├── scripts/             # section_1.py, section_2.py...（Coder 输出）
-└── media/videos/        # Manim 渲染的 MP4
+├── media/videos/        # Manim 渲染的各 Section MP4
+└── final_merged.mp4     # 合并后的最终视频
 ```
 
 ## 2. 关键代码约定
@@ -109,15 +110,21 @@ class Section1Scene(TeachingScene):
 
 ```bash
 # CLI 生成（必须在项目根目录）
-conda activate mathvideo
+# 如果使用 .venv:
+.venv/Scripts/activate   # Windows
 python -m mathvideo "勾股定理" --render
 python -m mathvideo "题目描述" --image ./img.png --render
+
+# 如果使用 conda:
+conda activate mathvideo
+python -m mathvideo "勾股定理" --render
 
 # 手动调试单个 Manim 脚本（PYTHONPATH 必须包含项目根目录）
 manim -ql output/<slug>/scripts/section_1.py Section1Scene
 
 # Web 开发（两个终端）
-conda run -n mathvideo python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+# 后端会自动检测 Python 环境（.venv → conda → 系统 python）
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 cd frontend && npm run dev    # http://localhost:3000
 
 # API
@@ -132,13 +139,17 @@ curl http://localhost:8000/docs   # Swagger UI
 |------|------|------|
 | `POST /api/generate/` | `backend/api/generate.py` | 启动生成任务，返回 `task_id`=slug |
 | `WS /api/generate/ws/{task_id}` | 同上 | 实时日志推送（心跳 30s，支持 ping/pong） |
+| `POST /api/generate/{slug}/regenerate/{section_id}` | 同上 | 重新生成指定 Section（支持递进模式上下文传递） |
 | `GET/DELETE /api/projects/` | `backend/api/projects.py` | 项目 CRUD |
 | `POST /api/refiner/{slug}/critique` | `backend/api/refiner.py` | 手动触发视觉分析 |
 | `/static/{path}` | 静态文件 | 挂载 `output/` 提供视频访问 |
 
 ### 关键实现细节
 - **WebSocket 竞态**: `run_generation()` 先等待最多 5 秒让 WebSocket 连接建立，再开始广播日志
-- **子进程**: Web 端通过 `asyncio.create_subprocess_shell` 执行 `conda run -n mathvideo python -u -m mathvideo ...`，实时读取 stdout 按 emoji 判断日志级别
+- **Python 环境自动检测**: `_detect_python_command()` 按优先级检测 `.venv/Scripts/python.exe` → `conda run -n mathvideo python` → `sys.executable`
+- **子进程**: Web 端通过 `asyncio.create_subprocess_shell` 执行自动检测到的 Python 命令 + `-u -m mathvideo ...`，实时读取 stdout 按 emoji 判断日志级别
+- **安全性**: 用户输入通过 `shlex.quote()` 转义后拼入 shell 命令，防止命令注入
+- **WebSocket 并发安全**: `_safe_broadcast()` 使用列表快照 + 安全移除，避免迭代时修改集合
 - **前端代理**: `frontend/next.config.js` 的 `rewrites` 将 `/api/*` 和 `/static/*` 代理到 `:8000`
 - **React Strict Mode 关闭**: 避免 WebSocket 在开发模式下双重挂载
 
@@ -163,14 +174,15 @@ curl http://localhost:8000/docs   # Swagger UI
 | `mathvideo/skills/` | 技能文件目录（common/, geometry/, knowledge/, problem/, proof/） |
 | `mathvideo/llm_client.py` | Claude API 封装（`ClaudeDirectChat` 继承 LangChain `BaseChatModel`） |
 | `mathvideo/gemini_native.py` | Gemini 原生 API 封装（`generateContent` 端点） |
-| `mathvideo/config.py` | 所有配置项（从 `.env` 读取），含功能开关 `USE_VISUAL_FEEDBACK` / `USE_ASSETS` |
+| `mathvideo/config.py` | 所有配置项（从 `.env` 读取），功能开关 `USE_VISUAL_FEEDBACK` / `USE_ASSETS`（支持环境变量覆盖） |
 | `mathvideo/utils.py` | `make_slug()` — 生成可控长度的项目 slug（截断+sha1 哈希） |
 
 ## 6. 环境与配置
 
 ```bash
-# Conda 环境: mathvideo (Python 3.10+)
-# 核心依赖: manim>=0.18, langchain, requests, json5, python-dotenv, opencv-python
+# Python 环境（自动检测优先级: .venv → conda → 系统 python）
+# 推荐使用 .venv 或 conda 环境, Python 3.10+
+# 核心依赖: manim>=0.18, langchain, requests, json5, python-dotenv, av (PyAV, Manim 自带)
 # 系统依赖: ffmpeg (Manim 必需), pdflatex (可选，有回退)
 
 # .env 必填
@@ -181,6 +193,8 @@ CLAUDE_MODEL_NAME=claude-opus-4-5-20251101    # 默认值
 GEMINI_API_KEY=AIza...                         # 启用视觉反馈
 GEMINI_VISION_MODEL_NAME=gemini-3-pro-preview  # 默认值
 ICONFINDER_API_KEY=...                         # 启用真实图标下载
+USE_VISUAL_FEEDBACK=true                       # 启用 Critic→Refiner 视觉反馈循环
+USE_ASSETS=true                                # 启用 AssetManager 图标下载
 ```
 
 ## 7. 注意事项
@@ -189,4 +203,4 @@ ICONFINDER_API_KEY=...                         # 启用真实图标下载
 - **JSON 容错**: `planner.py` 使用 `json5.loads` + 引号修复 + LLM 二次修复的三级回退解析 storyboard
 - **Manim 渲染质量**: CLI 使用 `-ql`（480p15），视频路径为 `media/videos/{script_name}/480p15/{ClassName}.mp4`
 - **导入顺序**: 生成的脚本必须先 `from mathvideo.manim_base import TeachingScene` 再 `from manim import *`，确保猴子补丁生效
-- **项目尚未实现**: `backend/api/generate.py` 的 `regenerate_section` 端点标记为 TODO
+- **视频合并**: 所有 Section 渲染完成后，`cli.py` 使用 PyAV (`av` 模块) 合并为 `final_merged.mp4`

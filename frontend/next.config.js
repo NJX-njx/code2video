@@ -9,6 +9,10 @@ const nextConfig = {
   // 禁用 React Strict Mode，避免开发模式下 WebSocket 双重挂载问题
   reactStrictMode: false,
 
+  // 跳过尾斜杠重定向，避免 /api/projects/ 被 308 重定向后
+  // 与 FastAPI 的 redirect_slashes 形成重定向循环
+  skipTrailingSlashRedirect: true,
+
   // Tauri 模式：standalone 输出（支持动态路由）
   ...(isTauri
     ? {
