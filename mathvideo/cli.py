@@ -233,7 +233,7 @@ def main():
                         # cwd=os.getcwd(): 设置工作目录为当前目录
                         # capture_output=True: 捕获标准输出和标准错误
                         # text=True: 以文本模式返回输出（而不是字节）
-                        result = subprocess.run(cmd, check=True, env=env, cwd=os.getcwd(), capture_output=True, text=True)
+                        result = subprocess.run(cmd, check=True, env=env, cwd=os.getcwd(), capture_output=True, text=True, encoding='utf-8', errors='replace')
                         # 渲染成功，打印成功信息
                         print(f"✨ Rendered {class_name} successfully.")
 
@@ -268,7 +268,7 @@ def main():
                                         print("♻️ Re-rendering refined code...")
                                         try:
                                             # 只重试一次渲染
-                                            subprocess.run(cmd, check=True, env=env, cwd=os.getcwd(), capture_output=True, text=True)
+                                            subprocess.run(cmd, check=True, env=env, cwd=os.getcwd(), capture_output=True, text=True, encoding='utf-8', errors='replace')
                                             print("✨ Refined render success!")
                                         except subprocess.CalledProcessError as e:
                                             print(f"❌ Refined render failed: {e.stderr}")
@@ -289,7 +289,7 @@ def main():
                         # 渲染失败，打印失败信息（包含尝试次数）
                         print(f"❌ Failed to render {class_name} (Attempt {attempt + 1}/{max_retries + 1})")
                         # 获取错误输出信息
-                        error_output = e.stderr
+                        error_output = e.stderr or e.stdout or "（无错误输出）"
                         # 打印错误详情（只显示最后500个字符，避免输出过长）
                         print(f"Error details:\n{error_output[-500:]}...")
 

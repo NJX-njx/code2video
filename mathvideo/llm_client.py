@@ -1,6 +1,8 @@
 # 直接使用 requests 调用 Anthropic API
 # 绕过 SDK 的 API 版本问题
+import time
 import requests
+from requests.exceptions import ConnectionError, Timeout
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
 from langchain_core.outputs import ChatResult, ChatGeneration
@@ -71,13 +73,26 @@ class ClaudeDirectChat(BaseChatModel):
         if stop:
             data["stop_sequences"] = stop
         
-        # 发送请求
-        response = requests.post(
-            self.api_url,
-            headers=headers,
-            json=data,
-            timeout=120
-        )
+        # 发送请求（带重试机制，防止 SSL 瞬断导致整个 section 失败）
+        max_retries = 3
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    self.api_url,
+                    headers=headers,
+                    json=data,
+                    timeout=180
+                )
+                break  # 请求成功，跳出重试循环
+            except (ConnectionError, Timeout, requests.exceptions.SSLError) as e:
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt  # 指数退避: 1s, 2s, 4s
+                    print(f"⚠️ API 请求失败 (第 {attempt + 1} 次)，{wait_time}s 后重试: {type(e).__name__}")
+                    time.sleep(wait_time)
+                else:
+                    raise Exception(
+                        f"API 请求在 {max_retries + 1} 次尝试后仍然失败: {type(e).__name__}: {e}"
+                    )
         
         if response.status_code != 200:
             raise Exception(f"API Error {response.status_code}: {response.text}")
