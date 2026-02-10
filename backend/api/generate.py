@@ -177,8 +177,25 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         await process.wait()
         
         if process.returncode == 0:
+            # CLI 可能已将目录重命名为 AI 生成的名称，需要检测实际 slug
+            actual_slug = task_id
+            # 从子进程输出中检测重命名日志 "📁 项目重命名: old → new"
+            # 也可以直接扫描 output 目录中包含相同 storyboard 的项目
+            task_dir = os.path.join(OUTPUT_DIR, task_id)
+            if not os.path.exists(task_dir):
+                # 目录已被重命名，扫描 output 查找最新的项目
+                try:
+                    candidates = sorted(
+                        [d for d in os.listdir(OUTPUT_DIR) if os.path.isdir(os.path.join(OUTPUT_DIR, d))],
+                        key=lambda d: os.path.getmtime(os.path.join(OUTPUT_DIR, d)),
+                        reverse=True
+                    )
+                    if candidates:
+                        actual_slug = candidates[0]
+                except OSError:
+                    pass
             await broadcast_log(task_id, "✅ 项目生成完成!", "success")
-            await broadcast_status(task_id, "completed", {"slug": task_id})
+            await broadcast_status(task_id, "completed", {"slug": actual_slug})
         else:
             await broadcast_log(task_id, f"❌ 生成过程出错，退出码: {process.returncode}", "error")
             await broadcast_status(task_id, "failed", {"error": f"退出码: {process.returncode}"})

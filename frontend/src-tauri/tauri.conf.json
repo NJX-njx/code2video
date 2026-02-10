@@ -4,13 +4,11 @@
   "version": "0.1.0",
   "identifier": "com.mathvideo.app",
   "build": {
-    "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "title": "MathVideo AI",
     "windows": [
       {
         "label": "main",

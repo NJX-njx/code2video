@@ -15,7 +15,7 @@ from mathvideo.agents.critic import VisualCritic
 # 导入任务类型路由器
 from mathvideo.agents.router import classify_task, get_section_mode
 from mathvideo.config import USE_VISUAL_FEEDBACK
-from mathvideo.utils import make_slug
+from mathvideo.utils import make_slug, rename_project_dir
 
 
 def main():
@@ -137,6 +137,18 @@ def main():
         print("❌ Failed to generate storyboard.")
         raise SystemExit(1)
 
+    # 步骤1.1: 用 AI 生成的 topic 重命名项目文件夹（让文件夹名有意义）
+    ai_topic = storyboard.get("topic", "").strip()
+    if ai_topic:
+        new_slug = make_slug(ai_topic)
+        new_base_dir = rename_project_dir(base_output_dir, new_slug)
+        if new_base_dir != base_output_dir:
+            print(f"📁 项目重命名: {os.path.basename(base_output_dir)} → {os.path.basename(new_base_dir)}")
+            base_output_dir = new_base_dir
+            scripts_dir = os.path.join(base_output_dir, "scripts")
+            media_dir = os.path.join(base_output_dir, "media")
+            topic_slug = os.path.basename(base_output_dir)
+
     # 构建故事板JSON文件的保存路径
     storyboard_path = os.path.join(base_output_dir, "storyboard.json")
     # 以写入模式打开文件，使用UTF-8编码
@@ -161,6 +173,7 @@ def main():
     # 步骤2：为每个章节生成代码
     # 递进模式下，当前 Section 的代码会作为下一个 Section 的上下文
     previous_section_code = ""  # 用于递进模式的上下文传递
+    rendered_videos = []  # 收集所有成功渲染的视频路径，用于最终合并
     # 遍历故事板中的所有章节
     for section in storyboard.get("sections", []):
         # 打印当前正在处理的章节ID
@@ -264,6 +277,12 @@ def main():
                             else:
                                 print(f"⚠️ Video not found: {video_path}")
 
+                        # 记录成功渲染的视频路径
+                        script_name_for_path = os.path.splitext(os.path.basename(filename))[0]
+                        rendered_path = os.path.join(media_dir, "videos", script_name_for_path, "480p15", f"{class_name}.mp4")
+                        if os.path.exists(rendered_path):
+                            rendered_videos.append(rendered_path)
+
                         # 跳出重试循环
                         break  # Success!
                     except subprocess.CalledProcessError as e:
@@ -300,6 +319,79 @@ def main():
                         else:
                             # 已达到最大重试次数，放弃当前章节，继续处理下一个
                             print("❌ Max retries reached. Moving to next section.")
+
+    # 步骤5：合并所有分镜视频为一个完整视频
+    if args.render and len(rendered_videos) > 1:
+        print(f"\n🎬 正在合并 {len(rendered_videos)} 个分镜视频...")
+        final_video = _merge_videos(rendered_videos, base_output_dir)
+        if final_video:
+            print(f"✨ 完整视频已生成: {final_video}")
+        else:
+            print("⚠️ 视频合并失败，各分镜视频仍可单独播放")
+    elif args.render and len(rendered_videos) == 1:
+        # 只有一个视频，直接复制为最终视频
+        import shutil
+        final_path = os.path.join(base_output_dir, "final_video.mp4")
+        shutil.copy2(rendered_videos[0], final_path)
+        print(f"✨ 最终视频: {final_path}")
+
+    print(f"\n✅ 项目完成: {base_output_dir}")
+
+
+def _merge_videos(video_paths: list, output_dir: str) -> str:
+    """
+    使用 ffmpeg 将多个分镜视频合并为一个完整视频。
+
+    使用 ffmpeg 的 concat demuxer 模式，将相同编码的视频快速拼接。
+    如果 ffmpeg 不可用，回退为返回 None。
+
+    参数:
+        video_paths: 按顺序排列的视频文件路径列表
+        output_dir: 输出目录
+
+    返回:
+        str: 合并后的视频文件路径，或失败时返回 None
+    """
+    import shutil
+
+    final_path = os.path.join(output_dir, "final_video.mp4")
+
+    # 检查 ffmpeg 是否可用
+    ffmpeg_cmd = shutil.which("ffmpeg")
+    if not ffmpeg_cmd:
+        print("⚠️ ffmpeg 未找到，无法合并视频")
+        return None
+
+    # 创建 ffmpeg concat 文件列表
+    concat_list_path = os.path.join(output_dir, "_concat_list.txt")
+    try:
+        with open(concat_list_path, "w", encoding="utf-8") as f:
+            for vp in video_paths:
+                # ffmpeg concat demuxer 需要绝对路径，用单引号包裹并转义反斜杠
+                abs_path = os.path.abspath(vp).replace("\\", "/")
+                f.write(f"file '{abs_path}'\n")
+
+        # 执行 ffmpeg 合并
+        import sys
+        cmd = [
+            ffmpeg_cmd, "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", concat_list_path,
+            "-c", "copy",  # 直接复制流，不重新编码，速度极快
+            final_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode == 0 and os.path.exists(final_path):
+            # 清理临时文件
+            os.remove(concat_list_path)
+            return final_path
+        else:
+            print(f"⚠️ ffmpeg 合并失败: {result.stderr[-300:] if result.stderr else '未知错误'}")
+            return None
+    except Exception as e:
+        print(f"⚠️ 视频合并异常: {e}")
+        return None
 
 
 # 程序入口点：当脚本被直接运行时（而不是被导入），执行main函数
