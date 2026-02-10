@@ -1,31 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Play, FolderOpen, Plus } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Plus, FolderOpen, Play, ArrowRight, Sparkles, Cpu, Eye } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import GenerateForm from '@/components/GenerateForm';
 import ProjectList from '@/components/ProjectList';
 import LogViewer from '@/components/LogViewer';
-
-// 日志消息类型
-interface LogMessage {
-  level: 'info' | 'success' | 'warning' | 'error';
-  message: string;
-  timestamp: Date;
-}
-
-// 生成状态类型
-type GenerateStatus = 'idle' | 'running' | 'completed' | 'failed';
+import type { LogMessage, GenerateStatus } from '@/lib/types';
 
 export default function Home() {
-  // 当前视图状态：'home' | 'generate' | 'projects'
   const [view, setView] = useState<'home' | 'generate' | 'projects'>('home');
-  
-  // 生成任务状态
   const [taskId, setTaskId] = useState<string | null>(null);
   const [status, setStatus] = useState<GenerateStatus>('idle');
   const [logs, setLogs] = useState<LogMessage[]>([]);
 
-  // 处理生成任务开始
   const handleGenerateStart = (newTaskId: string) => {
     setTaskId(newTaskId);
     setStatus('running');
@@ -33,161 +25,199 @@ export default function Home() {
     setView('generate');
   };
 
-  // 添加日志
   const addLog = useCallback((level: LogMessage['level'], message: string) => {
     setLogs(prev => [...prev, { level, message, timestamp: new Date() }]);
   }, []);
 
-  // 处理状态更新
   const handleStatusUpdate = useCallback((newStatus: GenerateStatus) => {
     setStatus(newStatus);
   }, []);
 
+  const features = [
+    {
+      icon: <Sparkles className="h-5 w-5" />,
+      title: '智能规划',
+      description: '使用 AI 自动将数学主题拆解为结构化的分镜脚本',
+    },
+    {
+      icon: <Cpu className="h-5 w-5" />,
+      title: '代码生成',
+      description: '自动生成 Manim 动画代码，支持错误自动修复',
+    },
+    {
+      icon: <Eye className="h-5 w-5" />,
+      title: '视觉反馈',
+      description: '使用视觉模型分析生成的视频，优化布局和样式',
+    },
+  ];
+
   return (
-    <main className="min-h-screen p-8">
-      {/* 顶部导航 */}
-      <header className="max-w-6xl mx-auto mb-8">
-        <div className="flex items-center justify-between">
-          <h1 
-            className="text-3xl font-bold text-manim-accent cursor-pointer"
-            onClick={() => setView('home')}
+    <div className="min-h-screen">
+      {/* 导航栏 — 毛玻璃效果 */}
+      <header className="sticky top-0 z-50 glass-strong">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <button
+            onClick={() => { setView('home'); setStatus('idle'); }}
+            className="flex items-center gap-2 font-semibold text-lg tracking-tight hover:opacity-80 transition-opacity"
           >
-            📐 MathVideo
-          </h1>
-          <nav className="flex gap-4">
-            <button
+            <span className="text-xl">📐</span>
+            <span>MathVideo</span>
+          </button>
+
+          <nav className="flex items-center gap-1">
+            <Button
+              variant={view === 'home' ? 'secondary' : 'ghost'}
+              size="sm"
               onClick={() => setView('home')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                view === 'home' ? 'bg-manim-accent text-manim-bg' : 'hover:bg-manim-surface'
-              }`}
+              className="gap-1.5"
             >
-              <Plus size={18} />
+              <Plus className="h-4 w-4" />
               新建
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={view === 'projects' ? 'secondary' : 'ghost'}
+              size="sm"
               onClick={() => setView('projects')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                view === 'projects' ? 'bg-manim-accent text-manim-bg' : 'hover:bg-manim-surface'
-              }`}
+              className="gap-1.5"
             >
-              <FolderOpen size={18} />
+              <FolderOpen className="h-4 w-4" />
               项目
-            </button>
+            </Button>
+            <div className="w-px h-5 bg-border mx-1" />
+            <ThemeToggle />
           </nav>
         </div>
       </header>
 
-      {/* 主内容区 */}
-      <div className="max-w-6xl mx-auto">
-        {view === 'home' && (
-          <div className="space-y-8">
-            {/* 欢迎区域 */}
-            <div className="text-center py-12">
-              <h2 className="text-4xl font-bold mb-4">
-                自动化数学视频生成器
-              </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                输入任何数学主题，AI 将自动生成教学分镜、Manim 动画代码，并渲染成精美的教学视频。
-              </p>
-            </div>
+      {/* 主内容 */}
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        <AnimatePresence mode="wait">
+          {view === 'home' && (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-12"
+            >
+              {/* Hero */}
+              <div className="text-center pt-12 pb-4">
+                <Badge variant="secondary" className="mb-4">
+                  AI-Powered
+                </Badge>
+                <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+                  数学视频，
+                  <span className="text-primary">自动生成</span>
+                </h1>
+                <p className="text-muted-foreground text-lg max-w-xl mx-auto leading-relaxed">
+                  输入任何数学主题，AI 自动生成教学分镜、Manim 动画代码，渲染成精美的教学视频。
+                </p>
+              </div>
 
-            {/* 生成表单 */}
-            <GenerateForm 
-              onGenerateStart={handleGenerateStart}
-              disabled={status === 'running'}
-            />
+              {/* 生成表单 */}
+              <GenerateForm
+                onGenerateStart={handleGenerateStart}
+                disabled={status === 'running'}
+              />
 
-            {/* 功能特性 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-              <div className="bg-manim-surface rounded-xl p-6">
-                <div className="text-3xl mb-4">🤖</div>
-                <h3 className="text-xl font-semibold mb-2">智能规划</h3>
-                <p className="text-gray-400">
-                  使用 Claude AI 自动将数学主题拆解为结构化的分镜脚本
-                </p>
+              {/* 功能特性 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+                {features.map((feature, i) => (
+                  <Card key={i} className="group hover:-translate-y-1 transition-all duration-300">
+                    <CardContent className="p-6">
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        {feature.icon}
+                      </div>
+                      <h3 className="font-semibold mb-1.5">{feature.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {feature.description}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-              <div className="bg-manim-surface rounded-xl p-6">
-                <div className="text-3xl mb-4">🎬</div>
-                <h3 className="text-xl font-semibold mb-2">代码生成</h3>
-                <p className="text-gray-400">
-                  自动生成 Manim Python 动画代码，支持错误自动修复
-                </p>
-              </div>
-              <div className="bg-manim-surface rounded-xl p-6">
-                <div className="text-3xl mb-4">👁️</div>
-                <h3 className="text-xl font-semibold mb-2">视觉反馈</h3>
-                <p className="text-gray-400">
-                  使用视觉大模型分析生成的视频，自动优化布局和样式
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
 
-        {view === 'generate' && (
-          <div className="space-y-6">
-            {/* 状态指示器 */}
-            <div className="bg-manim-surface rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">
-                  {status === 'running' && '🔄 正在生成...'}
-                  {status === 'completed' && '✅ 生成完成'}
-                  {status === 'failed' && '❌ 生成失败'}
-                  {status === 'idle' && '⏳ 准备就绪'}
-                </h2>
-                {status === 'running' && (
-                  <div className="w-6 h-6 border-2 border-manim-accent border-t-transparent rounded-full animate-spin" />
-                )}
-              </div>
-              
-              {taskId && (
-                <p className="text-gray-400">
-                  任务 ID: <code className="bg-manim-bg px-2 py-1 rounded">{taskId}</code>
-                </p>
+          {view === 'generate' && (
+            <motion.div
+              key="generate"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
+              {/* 状态卡片 */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {status === 'running' && (
+                        <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      )}
+                      <h2 className="text-lg font-semibold">
+                        {status === 'running' && '正在生成...'}
+                        {status === 'completed' && '✅ 生成完成'}
+                        {status === 'failed' && '生成失败'}
+                        {status === 'idle' && '准备就绪'}
+                      </h2>
+                    </div>
+                    {taskId && (
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {taskId}
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 日志 */}
+              <LogViewer
+                taskId={taskId}
+                logs={logs}
+                onLog={addLog}
+                onStatusChange={handleStatusUpdate}
+              />
+
+              {/* 完成操作 */}
+              {status === 'completed' && taskId && (
+                <Card>
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <p className="text-muted-foreground">视频已生成，可以查看项目详情</p>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => { setView('home'); setStatus('idle'); setTaskId(null); setLogs([]); }}
+                      >
+                        新建项目
+                      </Button>
+                      <Button onClick={() => window.location.href = `/projects/${taskId}`}>
+                        <Play className="h-4 w-4 mr-1.5" />
+                        查看项目
+                        <ArrowRight className="h-4 w-4 ml-1.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
-            </div>
+            </motion.div>
+          )}
 
-            {/* 日志查看器 */}
-            <LogViewer 
-              taskId={taskId}
-              logs={logs}
-              onLog={addLog}
-              onStatusChange={handleStatusUpdate}
-            />
-
-            {/* 完成后的操作 */}
-            {status === 'completed' && taskId && (
-              <div className="bg-manim-surface rounded-xl p-6">
-                <h3 className="text-lg font-semibold mb-4">下一步操作</h3>
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => window.location.href = `/projects/${taskId}`}
-                    className="flex items-center gap-2 px-4 py-2 bg-manim-accent text-manim-bg rounded-lg hover:opacity-90"
-                  >
-                    <Play size={18} />
-                    查看项目
-                  </button>
-                  <button
-                    onClick={() => {
-                      setView('home');
-                      setStatus('idle');
-                      setTaskId(null);
-                      setLogs([]);
-                    }}
-                    className="px-4 py-2 border border-gray-600 rounded-lg hover:bg-manim-surface"
-                  >
-                    生成新项目
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {view === 'projects' && (
-          <ProjectList />
-        )}
-      </div>
-    </main>
+          {view === 'projects' && (
+            <motion.div
+              key="projects"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ProjectList />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+    </div>
   );
 }

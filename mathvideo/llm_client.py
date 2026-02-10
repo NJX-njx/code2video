@@ -17,12 +17,12 @@ class ClaudeDirectChat(BaseChatModel):
     
     model: str = CLAUDE_MODEL_NAME
     temperature: float = 0.7
-    max_tokens: int = 8192
+    max_tokens: int = 16384
     api_key: str = CLAUDE_API_KEY
     api_url: str = "https://api.anthropic.com/v1/messages"
     api_version: str = "2023-06-01"
     
-    def __init__(self, temperature: float = 0.7, max_tokens: int = 8192, **kwargs):
+    def __init__(self, temperature: float = 0.7, max_tokens: int = 16384, **kwargs):
         super().__init__(**kwargs)
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -96,7 +96,7 @@ class ClaudeDirectChat(BaseChatModel):
         )
 
 
-def get_llm(temperature=0.7):
+def get_llm(temperature=0.7, max_tokens=16384):
     """
     创建并返回一个配置好的 Claude 聊天模型实例
     
@@ -111,25 +111,34 @@ def get_llm(temperature=0.7):
             - 中等值 (0.5-0.7): 平衡创造性和准确性，适合一般对话和内容生成
             - 较高值 (0.8-1.0): 输出更随机、更有创造性，适合创意写作
             - 默认值: 0.7（平衡模式）
+        max_tokens (int, 可选): 控制模型输出的最大 token 数
+            - Claude Opus 4.5 支持最大 16384 输出 token
+            - 较小值 (1024-4096): 适合短文本任务（分类、简短回答）
+            - 中等值 (8192): 适合一般内容生成
+            - 较大值 (16384): 适合长代码生成、详细 storyboard
+            - 默认值: 16384（充分利用模型能力）
     
     返回:
         ClaudeDirectChat: 配置好的聊天模型实例，可用于调用Claude API
     
     使用示例:
-        # 创建默认配置的LLM（temperature=0.7）
+        # 创建默认配置的LLM（temperature=0.7, max_tokens=16384）
         llm = get_llm()
         
         # 创建低温度LLM（适合代码生成）
         llm = get_llm(temperature=0.2)
         
-        # 创建高温度LLM（适合创意内容）
-        llm = get_llm(temperature=0.9)
+        # 创建大输出LLM（适合长代码）
+        llm = get_llm(temperature=0.5, max_tokens=16384)
+        
+        # 创建小输出LLM（适合分类任务）
+        llm = get_llm(temperature=0.1, max_tokens=1024)
     
     注意事项:
         - 需要确保CLAUDE_API_KEY和CLAUDE_MODEL_NAME在config.py中正确配置
-        - max_tokens设置为8192，Claude支持更大的输出
+        - max_tokens 越大，API 调用费用越高（按输出 token 计费）
         - 如果遇到API调用失败，请检查网络连接和API密钥是否有效
     """
     if not CLAUDE_API_KEY:
         raise RuntimeError("CLAUDE_API_KEY 未设置，请在 .env 中配置后再运行。")
-    return ClaudeDirectChat(temperature=temperature, max_tokens=8192)
+    return ClaudeDirectChat(temperature=temperature, max_tokens=max_tokens)

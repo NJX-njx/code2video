@@ -1,7 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Sparkles, Loader2, Upload, X, ImageIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { startGeneration } from '@/lib/api';
 
 interface GenerateFormProps {
   onGenerateStart: (taskId: string) => void;
@@ -12,21 +18,42 @@ export default function GenerateForm({ onGenerateStart, disabled }: GenerateForm
   const [prompt, setPrompt] = useState('');
   const [render, setRender] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 示例输入
   const examples = [
-    '请讲解勾股定理的证明思路',
-    '已知圆的半径为 r，解释圆面积公式的来源',
-    '这张图里的三角形面积如何计算？',
-    '解释二次函数顶点与对称轴',
-    '给出等差数列通项公式的推导',
+    '勾股定理的证明',
+    '圆面积公式推导',
+    '二次函数图像',
+    '等差数列通项',
+    '正弦定理证明',
   ];
+
+  const handleImageSelect = (file: File) => {
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file?.type.startsWith('image/')) handleImageSelect(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!prompt.trim() && !imageFile) {
       setError('请输入文本或上传图片');
       return;
@@ -36,33 +63,8 @@ export default function GenerateForm({ onGenerateStart, disabled }: GenerateForm
     setError(null);
 
     try {
-      let response: Response;
-      if (imageFile) {
-        const formData = new FormData();
-        formData.append('prompt', prompt.trim());
-        formData.append('render', render ? 'true' : 'false');
-        formData.append('image', imageFile);
-        response = await fetch('/api/generate/', {
-          method: 'POST',
-          body: formData,
-        });
-      } else {
-        response = await fetch('/api/generate/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ prompt: prompt.trim(), render }),
-        });
-      }
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || '生成请求失败');
-      }
-
-      const data = await response.json();
-      onGenerateStart(data.task_id);
+      const data = await startGeneration(prompt.trim(), render, imageFile);
+      onGenerateStart(data.task_id!);
     } catch (err) {
       setError(err instanceof Error ? err.message : '未知错误');
     } finally {
@@ -71,102 +73,128 @@ export default function GenerateForm({ onGenerateStart, disabled }: GenerateForm
   };
 
   return (
-    <div className="bg-manim-surface rounded-xl p-8">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 主题输入 */}
-        <div>
-          <label htmlFor="prompt" className="block text-sm font-medium mb-2">
-            输入内容（主题/问题/描述）
-          </label>
-          <textarea
-            id="prompt"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="例如：请解释勾股定理的证明步骤，或描述一个题目场景..."
-            className="w-full min-h-[96px] px-4 py-3 bg-manim-bg border border-gray-700 rounded-lg focus:outline-none focus:border-manim-accent transition-colors"
-            disabled={disabled || loading}
-          />
-        </div>
+    <Card className="border-dashed">
+      <CardContent className="p-6 sm:p-8">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* 输入区 */}
+          <div>
+            <Textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="输入数学主题、问题或描述..."
+              className="min-h-[100px] text-base"
+              disabled={disabled || loading}
+            />
+          </div>
 
-        {/* 图片输入 */}
-        <div>
-          <label htmlFor="image" className="block text-sm font-medium mb-2">
-            上传图片（可选）
-          </label>
-          <input
-            id="image"
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-manim-bg file:text-gray-200 hover:file:bg-gray-700"
-            disabled={disabled || loading}
-          />
-          {imageFile && (
-            <p className="mt-2 text-xs text-gray-400">
-              已选择：{imageFile.name}
-            </p>
-          )}
-        </div>
-
-        {/* 快速选择示例 */}
-        <div>
-          <p className="text-sm text-gray-400 mb-2">快速选择：</p>
+          {/* 快速示例 */}
           <div className="flex flex-wrap gap-2">
-            {examples.map((example) => (
-              <button
-                key={example}
-                type="button"
-                onClick={() => setPrompt(example)}
-                className="px-3 py-1 text-sm bg-manim-bg rounded-full hover:bg-gray-700 transition-colors"
-                disabled={disabled || loading}
+            {examples.map((ex) => (
+              <Badge
+                key={ex}
+                variant="outline"
+                className="cursor-pointer hover:bg-accent transition-colors py-1"
+                onClick={() => setPrompt(ex)}
               >
-                {example}
-              </button>
+                {ex}
+              </Badge>
             ))}
           </div>
-        </div>
 
-        {/* 渲染选项 */}
-        <div className="flex items-center gap-3">
-          <input
-            id="render"
-            type="checkbox"
-            checked={render}
-            onChange={(e) => setRender(e.target.checked)}
-            className="w-4 h-4 rounded border-gray-600 bg-manim-bg text-manim-accent focus:ring-manim-accent"
-            disabled={disabled || loading}
-          />
-          <label htmlFor="render" className="text-sm">
-            生成后自动渲染视频
-          </label>
-        </div>
+          {/* 图片上传区 */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`relative rounded-lg border-2 border-dashed transition-colors ${
+              isDragging
+                ? 'border-primary bg-primary/5'
+                : 'border-border hover:border-muted-foreground/50'
+            } ${imagePreview ? 'p-3' : 'p-6'}`}
+          >
+            {imagePreview ? (
+              <div className="flex items-center gap-3">
+                <img
+                  src={imagePreview}
+                  alt="预览"
+                  className="h-16 w-16 rounded-md object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{imageFile?.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {((imageFile?.size ?? 0) / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={clearImage}
+                  className="shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="flex flex-col items-center gap-2 cursor-pointer text-muted-foreground"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="h-8 w-8" />
+                <p className="text-sm">拖拽图片到这里，或点击上传</p>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageSelect(file);
+              }}
+              disabled={disabled || loading}
+            />
+          </div>
 
-        {/* 错误提示 */}
+          {/* 底部操作栏 */}
+          <div className="flex items-center justify-between pt-2">
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <Switch
+                checked={render}
+                onCheckedChange={setRender}
+                disabled={disabled || loading}
+              />
+              <span className="text-sm text-muted-foreground">自动渲染视频</span>
+            </label>
+
+            <Button
+              type="submit"
+              disabled={disabled || loading || (!prompt.trim() && !imageFile)}
+              size="lg"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  启动中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  开始生成
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* 错误提示 */}
           {error && (
-            <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-lg text-manim-error">
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
               {error}
             </div>
           )}
-
-        {/* 提交按钮 */}
-        <button
-          type="submit"
-          disabled={disabled || loading || (!prompt.trim() && !imageFile)}
-          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-manim-accent text-manim-bg font-semibold rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-        >
-          {loading ? (
-            <>
-              <Loader2 size={20} className="animate-spin" />
-              启动中...
-            </>
-          ) : (
-            <>
-              <Sparkles size={20} />
-              开始生成
-            </>
-          )}
-        </button>
-      </form>
-    </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

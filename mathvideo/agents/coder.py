@@ -27,7 +27,8 @@ def generate_code(section_data: dict, previous_code: str = "", task_type: str = 
         tuple: (code, class_name) 元组
     """
     # 创建LLM客户端实例
-    llm = get_llm(temperature=0.5)
+    # max_tokens=16384：代码生成任务需要充足的输出空间，避免代码被截断
+    llm = get_llm(temperature=0.5, max_tokens=16384)
     
     # 根据任务类型和是否有前序代码选择 Prompt 模板
     is_sequential = (task_type in ("geometry", "proof")) and bool(previous_code)
@@ -127,7 +128,8 @@ def fix_code(code: str, error_message: str):
     # 创建LLM客户端实例
     # temperature=0.2：极低温度，确保修复的准确性和一致性
     # 代码修复需要精确性，所以使用极低温度
-    llm = get_llm(temperature=0.2) # Very low temp for fixing
+    # max_tokens=16384：修复后的代码可能与原始代码等长，需要足够空间
+    llm = get_llm(temperature=0.2, max_tokens=16384)
     # 从代码修复提示模板创建聊天提示模板
     # FIX_CODE_PROMPT包含错误修复的详细指令和格式要求
     prompt = ChatPromptTemplate.from_template(FIX_CODE_PROMPT)
@@ -171,7 +173,8 @@ def refine_code(code: str, feedback: str):
     """
     # 创建LLM客户端
     # temperature=0.3：适中的温度，允许一点灵活性来调整布局，但保持逻辑
-    llm = get_llm(temperature=0.3)
+    # max_tokens=16384：优化后的代码需要完整输出
+    llm = get_llm(temperature=0.3, max_tokens=16384)
     
     # 创建提示模板
     prompt = ChatPromptTemplate.from_template(REFINE_CODE_PROMPT)

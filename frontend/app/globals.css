@@ -2,75 +2,120 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 30, 30, 46;
-  --background-end-rgb: 24, 24, 37;
+/* ===== Google Fonts ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@layer base {
+  /* ===== 浅色主题 (Notion 风) ===== */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 236 84% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 236 84% 67%;
+    --radius: 0.75rem;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+  }
+
+  /* ===== 深色主题 (Apple 暗色风) ===== */
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 221 83% 69%;
+    --primary-foreground: 0 0% 5%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 63% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 20%;
+    --input: 240 4% 20%;
+    --ring: 221 83% 69%;
+    --success: 142 71% 55%;
+    --warning: 38 92% 60%;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
-  min-height: 100vh;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
 }
 
-/* 滚动条样式 */
+/* ===== 滚动条 ===== */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e1e2e;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #45475a;
-  border-radius: 4px;
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #585b70;
+  background: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* 日志样式 */
+/* ===== 日志级别颜色 ===== */
 .log-info {
-  color: #cdd6f4;
+  @apply text-foreground;
 }
 
 .log-success {
-  color: #a6e3a1;
+  color: hsl(var(--success));
 }
 
 .log-warning {
-  color: #f9e2af;
+  color: hsl(var(--warning));
 }
 
 .log-error {
-  color: #f38ba8;
+  @apply text-destructive;
 }
 
-/* Monaco Editor 容器 */
-.monaco-container {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-/* 动画 */
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 5px rgba(137, 180, 250, 0.5);
+/* ===== 毛玻璃效果工具类 ===== */
+@layer utilities {
+  .glass {
+    @apply bg-white/70 dark:bg-zinc-900/60 backdrop-blur-xl border border-white/20 dark:border-white/10;
   }
-  50% {
-    box-shadow: 0 0 20px rgba(137, 180, 250, 0.8);
+
+  .glass-strong {
+    @apply bg-white/90 dark:bg-zinc-900/80 backdrop-blur-2xl border border-white/30 dark:border-white/10;
   }
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+/* ===== 选中效果 ===== */
+::selection {
+  @apply bg-primary/20;
 }

@@ -247,7 +247,8 @@ def generate_storyboard(prompt: str, image_paths: Optional[List[str]] = None, ta
         selected_prompt = selected_prompt + "\n" + skills_text
     
     # 创建LLM客户端实例
-    llm = get_llm(temperature=0.7)
+    # max_tokens=16384：storyboard JSON 可能很长（多 section、详细描述），需要充足空间
+    llm = get_llm(temperature=0.7, max_tokens=16384)
     # 从提示模板创建聊天提示模板
     prompt_template = ChatPromptTemplate.from_template(selected_prompt)
     # 构建处理链

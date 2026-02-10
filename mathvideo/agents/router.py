@@ -41,7 +41,7 @@ def classify_task(prompt: str, image_context: Optional[str] = None) -> str:
         str: 任务类型标识，取值为 "knowledge" / "geometry" / "problem" / "proof"
     """
     # 使用低温度确保分类结果稳定一致
-    llm = get_llm(temperature=0.1)
+    llm = get_llm(temperature=0.1, max_tokens=1024)  # 分类任务只需短输出
     prompt_template = ChatPromptTemplate.from_template(ROUTER_PROMPT)
     chain = prompt_template | llm | StrOutputParser()
 

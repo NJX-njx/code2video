@@ -75,7 +75,7 @@ class VisualCritic:
         }
         payload = {
             "model": CLAUDE_MODEL_NAME,
-            "max_tokens": 1024,
+            "max_tokens": 4096,  # Critic 需要足够空间输出详细的视觉分析反馈
             "system": CRITIC_PROMPT,
             "messages": [{"role": "user", "content": blocks}],
         }
