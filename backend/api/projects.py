@@ -83,7 +83,8 @@ def get_project_info(slug: str) -> Optional[ProjectInfo]:
     )
 
 
-@router.get("/", response_model=ProjectListResponse)
+@router.get("", response_model=ProjectListResponse)
+@router.get("/", response_model=ProjectListResponse, include_in_schema=False)
 async def list_projects():
     """
     获取所有项目列表

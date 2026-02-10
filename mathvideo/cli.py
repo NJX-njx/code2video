@@ -63,6 +63,12 @@ def main():
     )
     # 添加可选标志参数：是否渲染视频
     parser.add_argument("--render", action="store_true", help="Render the video using Manim")
+    # Web 后端指定输出目录（跳过 slug 生成，直接使用后端已准备好的目录）
+    parser.add_argument(
+        "--output-dir",
+        default="",
+        help="指定输出目录路径（由 Web 后端传入，跳过 slug 生成）",
+    )
     # 解析命令行参数并存储到args对象中
     args = parser.parse_args()
 
@@ -72,11 +78,15 @@ def main():
         print("❌ 请提供文本输入或图片输入（或两者）。")
         raise SystemExit(1)
 
-    # 生成项目 slug（对长文本做截断+哈希）
-    image_hint = ",".join([os.path.basename(p) for p in args.image]) if args.image else None
-    topic_slug = make_slug(args.prompt.strip() or "image-input", extra=image_hint)
-    # 构建基础输出目录路径：output/{topic_slug}
-    base_output_dir = os.path.join("output", topic_slug)
+    # 如果后端已指定输出目录，直接使用；否则自行生成 slug
+    if args.output_dir:
+        base_output_dir = args.output_dir
+        topic_slug = os.path.basename(base_output_dir)
+    else:
+        # 生成项目 slug（对长文本做截断+哈希）
+        image_hint = ",".join([os.path.basename(p) for p in args.image]) if args.image else None
+        topic_slug = make_slug(args.prompt.strip() or "image-input", extra=image_hint)
+        base_output_dir = os.path.join("output", topic_slug)
     # 构建脚本目录路径：用于存储生成的Python代码文件
     scripts_dir = os.path.join(base_output_dir, "scripts")
     # 构建媒体目录路径：用于存储渲染后的视频文件

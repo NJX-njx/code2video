@@ -75,8 +75,10 @@ async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(error.detail || `API Error: ${response.status}`);
+    const error = await response.json().catch(() => ({
+      detail: `服务器错误 (${response.status})，请检查后端是否正常运行`
+    }));
+    throw new Error(error.detail || `API 错误: ${response.status}`);
   }
 
   return response.json();

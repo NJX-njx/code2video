@@ -5,16 +5,18 @@ import { Terminal, ClipboardList, ImageIcon, Code2, Film, Sparkles } from 'lucid
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getWebSocketBaseUrl } from '@/lib/api';
-import type { LogMessage, GenerateStatus } from '@/lib/types';
+import type { LogMessage, GenerateStatus, CompletionData } from '@/lib/types';
 
 interface LogViewerProps {
   taskId: string | null;
   logs: LogMessage[];
+  status?: GenerateStatus;
+  rendered?: boolean;
   onLog: (level: LogMessage['level'], message: string) => void;
-  onStatusChange: (status: GenerateStatus) => void;
+  onStatusChange: (status: GenerateStatus, data?: CompletionData) => void;
 }
 
-export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogViewerProps) {
+export default function LogViewer({ taskId, logs, status, rendered, onLog, onStatusChange }: LogViewerProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
@@ -56,7 +58,7 @@ export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogVi
         if (data.type === 'log') {
           onLogRef.current(data.level || 'info', data.message);
         } else if (data.type === 'status') {
-          onStatusChangeRef.current(data.status);
+          onStatusChangeRef.current(data.status, data.data);
           if (data.status === 'completed') {
             onLogRef.current('success', '所有任务已完成！');
           } else if (data.status === 'failed') {
@@ -102,27 +104,38 @@ export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogVi
     { key: 'refine', label: '优化', icon: Sparkles, patterns: ['critic', 'refin', '优化', '视觉'] },
   ] as const;
 
+  // 根据任务完成状态和是否渲染来决定显示哪些阶段
+  const visibleStages = useMemo(() => {
+    // 完成后且未渲染：隐藏渲染和优化阶段
+    if (status === 'completed' && rendered === false) {
+      return STAGES.filter(s => s.key !== 'render' && s.key !== 'refine');
+    }
+    return [...STAGES];
+  }, [status, rendered]);
+
   const currentStage = useMemo(() => {
     const allText = logs.map(l => l.message.toLowerCase()).join(' ');
     let lastIdx = -1;
-    let found = 0;
-    STAGES.forEach((stage, idx) => {
+    visibleStages.forEach((stage, idx) => {
       if (stage.patterns.some(p => allText.includes(p))) {
         lastIdx = idx;
-        found = idx + 1;
       }
     });
-    return { active: lastIdx, completed: found };
-  }, [logs]);
+    // 如果任务已完成, 标记所有可见阶段为完成
+    if (status === 'completed') {
+      return { active: -1, completed: visibleStages.length };
+    }
+    return { active: lastIdx, completed: lastIdx >= 0 ? lastIdx : 0 };
+  }, [logs, status, visibleStages]);
 
   return (
     <div className="space-y-3">
       {/* 阶段进度条 */}
       {logs.length > 0 && (
         <div className="flex items-center gap-1">
-          {STAGES.map((stage, i) => {
+          {visibleStages.map((stage, i) => {
             const Icon = stage.icon;
-            const isCompleted = i < currentStage.active;
+            const isCompleted = i < currentStage.completed;
             const isActive = i === currentStage.active;
             return (
               <div key={stage.key} className="flex items-center flex-1">
@@ -134,7 +147,7 @@ export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogVi
                   <Icon className={`h-3.5 w-3.5 ${isActive ? 'animate-pulse' : ''}`} />
                   <span className="hidden sm:inline">{stage.label}</span>
                 </div>
-                {i < STAGES.length - 1 && (
+                {i < visibleStages.length - 1 && (
                   <div className={`h-px w-3 shrink-0 ${
                     isCompleted ? 'bg-emerald-400' : 'bg-border'
                   }`} />

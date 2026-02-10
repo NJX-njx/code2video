@@ -24,6 +24,20 @@ OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 active_connections: dict[str, list[WebSocket]] = {}
 
 
+def _quote_arg(s: str) -> str:
+    """
+    跨平台安全引用 shell 参数。
+    
+    shlex.quote 在 Windows 上使用单引号包裹，但 cmd.exe 不认单引号，
+    会导致参数中包含字面单引号字符。本函数在 Windows 上使用双引号包裹。
+    """
+    if sys.platform == "win32":
+        # Windows cmd.exe 使用双引号；转义内部的双引号
+        escaped = s.replace('"', '\\"')
+        return f'"{escaped}"'
+    return shlex.quote(s)
+
+
 def _detect_python_command() -> str:
     """
     自动检测可用的 Python 执行命令。
@@ -154,12 +168,20 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         await broadcast_status(task_id, "running")
         await broadcast_log(task_id, f"🚀 开始生成项目: {prompt or '（仅图片输入）'}")
         
-        # 构建命令参数（使用 shlex.quote 防止命令注入）
+        # 构建命令参数
+        # 使用 _quote_arg 代替 shlex.quote，因为 shlex.quote 在 Windows 上
+        # 使用单引号包裹，而 cmd.exe 不认单引号，导致参数包含字面单引号字符
         args = []
         if prompt:
-            args.append(shlex.quote(prompt))
+            args.append(_quote_arg(prompt))
+        
+        # 传递 --output-dir 让 CLI 使用后端已准备好的目录（图片已保存在其中）
+        # 这避免了 CLI 重新生成 slug 可能导致的路径不一致
+        output_dir = os.path.join(OUTPUT_DIR, task_id)
+        args.extend(["--output-dir", _quote_arg(output_dir)])
+        
         for img_path in (image_paths or []):
-            args.extend(["--image", shlex.quote(img_path)])
+            args.extend(["--image", _quote_arg(img_path)])
         if render:
             args.append("--render")
         
@@ -214,7 +236,10 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
             # CLI 可能已将目录重命名为 AI 生成的名称，需要检测实际 slug
             actual_slug = _detect_renamed_slug(task_id)
             await broadcast_log(task_id, "✅ 项目生成完成!", "success")
-            await broadcast_status(task_id, "completed", {"slug": actual_slug})
+            await broadcast_status(task_id, "completed", {
+                "slug": actual_slug,
+                "rendered": render,  # 告知前端是否执行了渲染
+            })
         else:
             await broadcast_log(task_id, f"❌ 生成过程出错，退出码: {process.returncode}", "error")
             await broadcast_status(task_id, "failed", {"error": f"退出码: {process.returncode}"})
@@ -272,10 +297,14 @@ def _detect_renamed_slug(task_id: str) -> str:
         return task_id
 
 
-@router.post("/", response_model=GenerateResponse)
+@router.post("", response_model=GenerateResponse)
+@router.post("/", response_model=GenerateResponse, include_in_schema=False)
 async def start_generation(request: Request):
     """
     启动视频生成任务
+    
+    支持带尾斜杠和不带尾斜杠两种 URL 模式，
+    避免 Next.js 代理去掉尾斜杠后触发 FastAPI 的 307 重定向循环。
     
     参数:
         request: 包含 topic 和 render 选项的请求体

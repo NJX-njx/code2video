@@ -10,17 +10,19 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import GenerateForm from '@/components/GenerateForm';
 import ProjectList from '@/components/ProjectList';
 import LogViewer from '@/components/LogViewer';
-import type { LogMessage, GenerateStatus } from '@/lib/types';
+import type { LogMessage, GenerateStatus, CompletionData } from '@/lib/types';
 
 export default function Home() {
   const [view, setView] = useState<'home' | 'generate' | 'projects'>('home');
   const [taskId, setTaskId] = useState<string | null>(null);
   const [status, setStatus] = useState<GenerateStatus>('idle');
+  const [rendered, setRendered] = useState<boolean | undefined>(undefined);
   const [logs, setLogs] = useState<LogMessage[]>([]);
 
   const handleGenerateStart = (newTaskId: string) => {
     setTaskId(newTaskId);
     setStatus('running');
+    setRendered(undefined);
     setLogs([]);
     setView('generate');
   };
@@ -29,8 +31,11 @@ export default function Home() {
     setLogs(prev => [...prev, { level, message, timestamp: new Date() }]);
   }, []);
 
-  const handleStatusUpdate = useCallback((newStatus: GenerateStatus) => {
+  const handleStatusUpdate = useCallback((newStatus: GenerateStatus, data?: CompletionData) => {
     setStatus(newStatus);
+    if (data?.rendered !== undefined) {
+      setRendered(data.rendered);
+    }
   }, []);
 
   const features = [
@@ -170,7 +175,7 @@ export default function Home() {
                       )}
                       <h2 className="text-lg font-semibold">
                         {status === 'running' && '正在生成...'}
-                        {status === 'completed' && '✅ 生成完成'}
+                        {status === 'completed' && (rendered ? '✅ 视频生成完成' : '✅ 代码生成完成')}
                         {status === 'failed' && '生成失败'}
                         {status === 'idle' && '准备就绪'}
                       </h2>
@@ -188,6 +193,8 @@ export default function Home() {
               <LogViewer
                 taskId={taskId}
                 logs={logs}
+                status={status}
+                rendered={rendered}
                 onLog={addLog}
                 onStatusChange={handleStatusUpdate}
               />
@@ -196,11 +203,13 @@ export default function Home() {
               {status === 'completed' && taskId && (
                 <Card>
                   <CardContent className="p-6 flex items-center justify-between">
-                    <p className="text-muted-foreground">视频已生成，可以查看项目详情</p>
+                    <p className="text-muted-foreground">
+                      {rendered ? '视频已生成，可以查看项目详情' : '代码已生成（未渲染视频），可以查看项目详情'}
+                    </p>
                     <div className="flex gap-3">
                       <Button
                         variant="outline"
-                        onClick={() => { setView('home'); setStatus('idle'); setTaskId(null); setLogs([]); }}
+                        onClick={() => { setView('home'); setStatus('idle'); setRendered(undefined); setTaskId(null); setLogs([]); }}
                       >
                         新建项目
                       </Button>

@@ -66,7 +66,13 @@ export default function GenerateForm({ onGenerateStart, disabled }: GenerateForm
       const data = await startGeneration(prompt.trim(), render, imageFile);
       onGenerateStart(data.task_id!);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '未知错误');
+      const msg = err instanceof Error ? err.message : '未知错误';
+      // "Failed to fetch" 通常表示后端不可达或网络问题
+      if (msg === 'Failed to fetch') {
+        setError('无法连接到后端服务，请确认后端已启动 (端口 8000)');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

@@ -72,6 +72,13 @@ export interface LogMessage {
 
 export type GenerateStatus = 'idle' | 'running' | 'completed' | 'failed';
 
+/** WebSocket 完成状态附带的数据 */
+export interface CompletionData {
+  slug?: string;
+  rendered?: boolean;
+  error?: string;
+}
+
 // ============ Refiner 相关 ============
 
 export interface CritiqueResponse {
