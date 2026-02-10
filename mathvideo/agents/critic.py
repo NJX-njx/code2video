@@ -126,41 +126,53 @@ class VisualCritic:
 
         print(f"🧐 Critiquing video: {video_path}")
         
-        # 1. Extract Multiple Frames (every 1 second)
-        import subprocess
+        # 1. 使用 PyAV 提取帧（无需系统安装 ffmpeg CLI）
+        import av
         import glob
         import os
+        from PIL import Image
         
         frames_dir = os.path.join(os.path.dirname(video_path), "frames")
         os.makedirs(frames_dir, exist_ok=True)
         
-        # Clear old frames
+        # 清理旧帧
         for f in glob.glob(os.path.join(frames_dir, "frame_*.png")):
             os.remove(f)
             
         try:
-            # Extract frames: 1 frame per second, scaled to 320px width to reduce payload size
-            # 缩小图片尺寸可以减少 token 消耗并加快响应速度
-            image_pattern = os.path.join(frames_dir, "frame_%03d.png")
-            subprocess.run([
-                "ffmpeg", "-i", video_path, 
-                "-vf", "fps=1.0,scale=320:-1", 
-                image_pattern, "-y"
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            # 用 PyAV 打开视频，每秒提取 1 帧，缩放到 320px 宽度以减少 token 消耗
+            container = av.open(video_path)
+            stream = container.streams.video[0]
+            fps = float(stream.average_rate)  # 视频帧率
+            frame_interval = max(1, int(fps))  # 每秒取 1 帧
             
-            # 2. Collect up to 4 frames (Start, Middle, Middle, End)
+            frame_idx = 0
+            saved_count = 0
+            for frame in container.decode(video=0):
+                if frame_idx % frame_interval == 0:
+                    img = frame.to_image()  # PIL Image
+                    # 缩放到 320px 宽度，保持宽高比
+                    w, h = img.size
+                    new_w = 320
+                    new_h = int(h * new_w / w)
+                    img = img.resize((new_w, new_h), Image.LANCZOS)
+                    save_path = os.path.join(frames_dir, f"frame_{saved_count:03d}.png")
+                    img.save(save_path)
+                    saved_count += 1
+                frame_idx += 1
+            container.close()
+            
+            # 2. 选取最多 4 帧代表帧（首、中、中、尾），节省 token 和时间
             frame_files = sorted(glob.glob(os.path.join(frames_dir, "frame_*.png")))
             
-            # Logic to pick representative frames (max 4 to save tokens and time)
             if len(frame_files) > 4:
-                # Pick first, last, and equidistant middle ones
                 indices = [0, len(frame_files)//3, 2*len(frame_files)//3, len(frame_files)-1]
                 selected_frames = [frame_files[i] for i in indices]
             else:
                 selected_frames = frame_files
 
             if not selected_frames:
-                print("   ⚠️ No frames extracted for critique.")
+                print("   ⚠️ 未能提取到任何帧，跳过视觉分析。")
                 return None
 
             # 3. 构建视觉分析的消息格式
