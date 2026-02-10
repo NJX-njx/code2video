@@ -5,22 +5,18 @@ Refiner API
 提供视觉反馈和代码优化功能。
 """
 import os
-import sys
 import json
 import asyncio
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-# 将项目根目录添加到 Python 路径
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, PROJECT_ROOT)
-
 from mathvideo.agents.critic import VisualCritic
 from mathvideo.agents.coder import refine_code
 
 router = APIRouter()
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 

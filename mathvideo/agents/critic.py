@@ -77,7 +77,11 @@ class VisualCritic:
             "model": CLAUDE_MODEL_NAME,
             "max_tokens": 4096,  # Critic 需要足够空间输出详细的视觉分析反馈
             "system": CRITIC_PROMPT,
-            "messages": [{"role": "user", "content": blocks}],
+            # Claude 的 system 已包含 CRITIC_PROMPT，
+            # 用户消息中过滤掉重复的 CRITIC_PROMPT 文本
+            "messages": [{"role": "user", "content": [
+                b for b in blocks if not (b.get("type") == "text" and b.get("text") == CRITIC_PROMPT)
+            ] or blocks}],
         }
         try:
             response = requests.post(
@@ -159,7 +163,9 @@ class VisualCritic:
                 print("   ⚠️ No frames extracted for critique.")
                 return None
 
-            # 3. 构建 Gemini Vision API 的消息格式（通用 messages_content）
+            # 3. 构建视觉分析的消息格式
+            # 注意: CRITIC_PROMPT 在 Gemini 中作为文本消息传入，
+            # 在 Claude 中作为 system 消息传入（Claude _call_claude_vision 中处理）
             messages_content = [
                 {"type": "text", "text": CRITIC_PROMPT}
             ]

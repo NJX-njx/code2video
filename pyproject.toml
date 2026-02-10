@@ -15,14 +15,8 @@ authors = [
 dependencies = [
     "manim>=0.18.0",
     "langchain>=0.1.0",
-    "langchain-openai>=0.0.5",
-    "langchain-anthropic>=0.1.0",
-    "openai>=1.0.0",
     "pydantic>=2.0.0",
-    "python-slugify>=8.0.0",
     "python-dotenv>=1.0.0",
-    "opencv-python>=4.8.0",
-    "numpy>=1.24.0",
     "requests>=2.31.0",
     "json5>=0.9.0",
 ]

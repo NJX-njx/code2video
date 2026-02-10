@@ -102,7 +102,7 @@ def _parse_storyboard_json(raw_text: str, llm=None) -> Optional[dict]:
             pass
     return None
 
-def _describe_images(image_paths: List[str]) -> Optional[str]:
+def describe_images(image_paths: List[str]) -> Optional[str]:
     """
     使用 Gemini 视觉模型对输入图片进行简要描述，便于生成故事板。
     """
@@ -257,7 +257,7 @@ def generate_storyboard(prompt: str, image_paths: Optional[List[str]] = None, ta
     # 打印开始生成故事板的信息
     print(f"Planning storyboard for: {prompt or '（仅图片输入）'} [type={task_type}]...")
     try:
-        image_context = _describe_images(image_paths or []) if image_paths else None
+        image_context = describe_images(image_paths or []) if image_paths else None
         input_text = prompt.strip() if prompt else ""
         if not input_text and image_context:
             input_text = "用户仅提供了图片，请基于图像描述生成分镜。"

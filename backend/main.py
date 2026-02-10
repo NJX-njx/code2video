@@ -28,10 +28,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 配置 CORS，允许前端跨域访问
+# 配置 CORS，允许前端和 Tauri 桌面端跨域访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js 默认端口
+    allow_origins=[
+        "http://localhost:3000",   # Next.js 开发服务器
+        "tauri://localhost",       # Tauri (macOS)
+        "https://tauri.localhost", # Tauri (Windows/Linux)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

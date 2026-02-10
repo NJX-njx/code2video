@@ -53,12 +53,8 @@ GEMINI_VISION_MODEL_NAME = os.getenv("GEMINI_VISION_MODEL_NAME", "gemini-3-pro-p
 ICONFINDER_API_KEY = os.getenv("ICONFINDER_API_KEY", "")
 
 # 是否启用资产增强功能
-USE_ASSETS = True
+USE_ASSETS = os.getenv("USE_ASSETS", "true").lower() in ("1", "true", "yes")
 
 # 是否启用视觉反馈（High-end feature）
-# 已验证 Gemini API 可用，启用视觉反馈以获得自动代码改进建议
-USE_VISUAL_FEEDBACK = True
-
-# 视频尺寸配置
-FRAME_HEIGHT = 8.0
-FRAME_WIDTH = 14.22
+# 需要配置 GEMINI_API_KEY 或 CLAUDE_API_KEY 才能真正生效
+USE_VISUAL_FEEDBACK = os.getenv("USE_VISUAL_FEEDBACK", "true").lower() in ("1", "true", "yes")

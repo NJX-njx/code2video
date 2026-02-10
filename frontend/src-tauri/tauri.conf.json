@@ -5,6 +5,7 @@
   "identifier": "com.mathvideo.app",
   "build": {
     "devUrl": "http://localhost:3000",
+    "frontendDist": "../.next",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },

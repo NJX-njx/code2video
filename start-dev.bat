@@ -62,10 +62,12 @@ if /i "!MODE!"=="backend" (
     goto start_backend
 ) else if /i "!MODE!"=="frontend" (
     goto start_frontend
+) else if /i "!MODE!"=="tauri" (
+    goto start_tauri
 ) else if /i "!MODE!"=="all" (
     goto start_all
 ) else (
-    echo 用法: start-dev.bat [backend^|frontend^|all]
+    echo 用法: start-dev.bat [backend^|frontend^|tauri^|all]
     pause
     exit /b 1
 )
@@ -84,15 +86,23 @@ cd /d "%SCRIPT_DIR%\frontend"
 call npm run dev
 goto end
 
+:start_tauri
+echo.
+echo 🖥️ 启动 Tauri 桌面开发模式...
+echo 💡 请在另一终端运行: start-dev.bat backend
+cd /d "%SCRIPT_DIR%\frontend"
+call npm run tauri:dev
+goto end
+
 :start_all
 echo.
 echo 💡 提示: 请在两个终端分别运行:
 echo    CMD 1: start-dev.bat backend
 echo    CMD 2: start-dev.bat frontend
 echo.
-echo 或者使用以下命令在后台启动后端:
-echo    start /B python -m uvicorn backend.main:app --reload --port 8000
-echo    cd frontend && npm run dev
+echo 💡 Tauri 桌面模式:
+echo    CMD 1: start-dev.bat backend
+echo    CMD 2: start-dev.bat tauri
 echo.
 echo 现在启动后端服务器...
 cd /d "%SCRIPT_DIR%"

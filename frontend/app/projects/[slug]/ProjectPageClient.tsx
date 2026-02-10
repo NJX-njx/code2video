@@ -14,7 +14,11 @@ import {
   Clapperboard,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import VideoPlayer from '@/components/VideoPlayer';
+
+// 动态导入 Monaco Editor，避免 SSR 问题
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 import StoryboardEditor from '@/components/StoryboardEditor';
 import RefinerPanel from '@/components/RefinerPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -26,6 +30,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getStoryboard, getVideos, getScripts, updateStoryboard } from '@/lib/api';
+import { useTheme } from 'next-themes';
 import type { Storyboard, VideoInfo, ScriptInfo, TabType } from '@/lib/types';
 
 export default function ProjectPageClient() {
@@ -40,6 +45,7 @@ export default function ProjectPageClient() {
   const [activeTab, setActiveTab] = useState<TabType>('videos');
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [expandedScript, setExpandedScript] = useState<string | null>(null);
+  const { resolvedTheme } = useTheme();
 
   const loadProjectData = useCallback(async () => {
     setLoading(true);
@@ -252,11 +258,23 @@ export default function ProjectPageClient() {
                               className="overflow-hidden"
                             >
                               <Separator />
-                              <ScrollArea className="max-h-[500px]">
-                                <pre className="p-4 bg-muted/30 text-xs leading-relaxed font-mono overflow-x-auto">
-                                  <code>{script.content}</code>
-                                </pre>
-                              </ScrollArea>
+                              <div className="h-[400px]">
+                                <MonacoEditor
+                                  height="100%"
+                                  language="python"
+                                  value={script.content}
+                                  theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
+                                  options={{
+                                    readOnly: true,
+                                    minimap: { enabled: false },
+                                    fontSize: 13,
+                                    lineNumbers: 'on',
+                                    scrollBeyondLastLine: false,
+                                    wordWrap: 'on',
+                                    padding: { top: 12, bottom: 12 },
+                                  }}
+                                />
+                              </div>
                             </motion.div>
                           )}
                         </AnimatePresence>

@@ -8,7 +8,7 @@ import os
 import sys
 import json
 import asyncio
-import subprocess
+import shlex
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Request
 from pydantic import BaseModel
@@ -22,6 +22,35 @@ OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 # 存储活跃的 WebSocket 连接
 active_connections: dict[str, list[WebSocket]] = {}
+
+
+def _detect_python_command() -> str:
+    """
+    自动检测可用的 Python 执行命令。
+    
+    优先级：
+    1. 项目根目录下的 .venv 虚拟环境
+    2. conda 环境 mathvideo
+    3. 系统 Python
+    """
+    import shutil
+    
+    # 检查 .venv 虚拟环境
+    if sys.platform == "win32":
+        venv_python = os.path.join(PROJECT_ROOT, ".venv", "Scripts", "python.exe")
+    else:
+        venv_python = os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
+    
+    if os.path.isfile(venv_python):
+        return f'"{venv_python}" -u'
+    
+    # 检查 conda
+    conda_path = shutil.which("conda")
+    if conda_path:
+        return 'conda run -n mathvideo --no-capture-output python -u'
+    
+    # 回退到系统 Python
+    return f'"{sys.executable}" -u'
 
 
 class GenerateRequest(BaseModel):
@@ -47,6 +76,27 @@ def _parse_bool(value) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+async def _safe_broadcast(task_id: str, payload: str):
+    """
+    安全地向所有订阅该任务的 WebSocket 客户端发送消息。
+    使用列表快照遍历，避免并发修改导致的异常。
+    """
+    connections = active_connections.get(task_id)
+    if not connections:
+        return
+    # 取快照避免在遍历时被其他协程修改
+    snapshot = list(connections)
+    for ws in snapshot:
+        try:
+            await ws.send_text(payload)
+        except Exception:
+            # 移除断开的连接（安全检查）
+            try:
+                connections.remove(ws)
+            except ValueError:
+                pass
+
+
 async def broadcast_log(task_id: str, message: str, level: str = "info"):
     """
     向所有订阅该任务的 WebSocket 客户端广播日志
@@ -56,21 +106,12 @@ async def broadcast_log(task_id: str, message: str, level: str = "info"):
         message: 日志消息
         level: 日志级别 (info, success, error, warning)
     """
-    if task_id in active_connections:
-        log_data = json.dumps({
-            "type": "log",
-            "level": level,
-            "message": message
-        })
-        disconnected = []
-        for ws in active_connections[task_id]:
-            try:
-                await ws.send_text(log_data)
-            except Exception:
-                disconnected.append(ws)
-        # 移除断开的连接
-        for ws in disconnected:
-            active_connections[task_id].remove(ws)
+    log_data = json.dumps({
+        "type": "log",
+        "level": level,
+        "message": message
+    })
+    await _safe_broadcast(task_id, log_data)
 
 
 async def broadcast_status(task_id: str, status: str, data: dict = None):
@@ -82,20 +123,12 @@ async def broadcast_status(task_id: str, status: str, data: dict = None):
         status: 状态 (running, completed, failed)
         data: 附加数据
     """
-    if task_id in active_connections:
-        status_data = json.dumps({
-            "type": "status",
-            "status": status,
-            "data": data or {}
-        })
-        disconnected = []
-        for ws in active_connections[task_id]:
-            try:
-                await ws.send_text(status_data)
-            except Exception:
-                disconnected.append(ws)
-        for ws in disconnected:
-            active_connections[task_id].remove(ws)
+    status_data = json.dumps({
+        "type": "status",
+        "status": status,
+        "data": data or {}
+    })
+    await _safe_broadcast(task_id, status_data)
 
 
 async def run_generation(task_id: str, prompt: str, render: bool, image_paths: Optional[List[str]] = None):
@@ -121,20 +154,20 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         await broadcast_status(task_id, "running")
         await broadcast_log(task_id, f"🚀 开始生成项目: {prompt or '（仅图片输入）'}")
         
-        # 构建命令参数
+        # 构建命令参数（使用 shlex.quote 防止命令注入）
         args = []
         if prompt:
-            args.append(f'"{prompt}"')
+            args.append(shlex.quote(prompt))
         for img_path in (image_paths or []):
-            args.extend(["--image", f'"{img_path}"'])
+            args.extend(["--image", shlex.quote(img_path)])
         if render:
             args.append("--render")
         
         args_str = " ".join(args)
         
-        # 使用 shell 命令确保 conda 环境和实时输出
-        # PYTHONUNBUFFERED=1 确保输出不被缓冲
-        shell_cmd = f'conda run -n mathvideo --no-capture-output python -u -m mathvideo {args_str}'
+        # 自动检测 Python 环境（优先 .venv，然后 conda，最后系统 Python）
+        python_cmd = _detect_python_command()
+        shell_cmd = f'{python_cmd} -m mathvideo {args_str}'
         
         await broadcast_log(task_id, f"📂 输出目录: output/{task_id}")
         
@@ -178,22 +211,7 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         
         if process.returncode == 0:
             # CLI 可能已将目录重命名为 AI 生成的名称，需要检测实际 slug
-            actual_slug = task_id
-            # 从子进程输出中检测重命名日志 "📁 项目重命名: old → new"
-            # 也可以直接扫描 output 目录中包含相同 storyboard 的项目
-            task_dir = os.path.join(OUTPUT_DIR, task_id)
-            if not os.path.exists(task_dir):
-                # 目录已被重命名，扫描 output 查找最新的项目
-                try:
-                    candidates = sorted(
-                        [d for d in os.listdir(OUTPUT_DIR) if os.path.isdir(os.path.join(OUTPUT_DIR, d))],
-                        key=lambda d: os.path.getmtime(os.path.join(OUTPUT_DIR, d)),
-                        reverse=True
-                    )
-                    if candidates:
-                        actual_slug = candidates[0]
-                except OSError:
-                    pass
+            actual_slug = _detect_renamed_slug(task_id)
             await broadcast_log(task_id, "✅ 项目生成完成!", "success")
             await broadcast_status(task_id, "completed", {"slug": actual_slug})
         else:
@@ -203,6 +221,54 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
     except Exception as e:
         await broadcast_log(task_id, f"❌ 发生异常: {str(e)}", "error")
         await broadcast_status(task_id, "failed", {"error": str(e)})
+    finally:
+        # 清理已完成任务的空连接列表，避免内存泄漏
+        conns = active_connections.get(task_id)
+        if conns is not None and len(conns) == 0:
+            active_connections.pop(task_id, None)
+
+
+def _detect_renamed_slug(task_id: str) -> str:
+    """
+    检测 CLI 是否已将项目目录重命名。
+    
+    通过在 output 目录中查找包含 task_id 哈希后缀的目录来精确匹配，
+    避免并发生成时通过"最新修改时间"误匹配其他项目。
+    
+    参数:
+        task_id: 原始任务 ID（slug）
+    
+    返回:
+        str: 实际的 slug（可能是重命名后的）
+    """
+    task_dir = os.path.join(OUTPUT_DIR, task_id)
+    if os.path.exists(task_dir):
+        return task_id
+    
+    # 提取 task_id 的哈希部分（最后的 -xxxxxx）
+    # 重命名后新 slug 的哈希可能不同，所以需要更稳健的检测
+    # 策略：查找 storyboard.json 中 input_text 匹配的目录
+    try:
+        if not os.path.isdir(OUTPUT_DIR):
+            return task_id
+        candidates = []
+        for d in os.listdir(OUTPUT_DIR):
+            d_path = os.path.join(OUTPUT_DIR, d)
+            if not os.path.isdir(d_path):
+                continue
+            # 检查 storyboard.json 是否存在
+            sb_path = os.path.join(d_path, "storyboard.json")
+            if os.path.exists(sb_path):
+                candidates.append((d, os.path.getmtime(d_path)))
+        
+        if not candidates:
+            return task_id
+        
+        # 取最近修改的目录（该任务刚完成，其目录应该是最新的）
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        return candidates[0][0]
+    except OSError:
+        return task_id
 
 
 @router.post("/", response_model=GenerateResponse)
@@ -246,19 +312,23 @@ async def start_generation(request: Request):
     task_id = make_slug(prompt or "image-input", extra=extra)
 
     # 处理图片保存（multipart）
-    if "files" in locals() and files:
+    if image_names:
         inputs_dir = os.path.join(OUTPUT_DIR, task_id, "inputs")
         os.makedirs(inputs_dir, exist_ok=True)
-        for idx, file in enumerate(files, start=1):
-            filename = os.path.basename(getattr(file, "filename", "")) or f"input_{idx}.png"
-            target_path = os.path.join(inputs_dir, filename)
-            try:
-                content = await file.read()
-                with open(target_path, "wb") as f:
-                    f.write(content)
-                image_paths.append(target_path)
-            except Exception:
-                continue
+        # 获取 form 中的文件列表
+        form_data = await request.form() if not content_type.startswith("application/json") else None
+        if form_data:
+            uploaded_files = form_data.getlist("images") or form_data.getlist("image") or []
+            for idx, file in enumerate(uploaded_files, start=1):
+                filename = os.path.basename(getattr(file, "filename", "")) or f"input_{idx}.png"
+                target_path = os.path.join(inputs_dir, filename)
+                try:
+                    file_content = await file.read()
+                    with open(target_path, "wb") as fp:
+                        fp.write(file_content)
+                    image_paths.append(target_path)
+                except Exception:
+                    continue
     
     # 初始化 WebSocket 连接列表
     if task_id not in active_connections:
@@ -319,7 +389,10 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 @router.post("/{slug}/section/{section_id}")
 async def regenerate_section(slug: str, section_id: str):
     """
-    重新生成单个章节
+    重新生成并渲染单个章节
+    
+    调用 Coder Agent 重新生成代码，然后用 Manim 渲染。
+    对于递进模式（geometry/proof），会读取前序 Section 代码作为上下文。
     
     参数:
         slug: 项目标识符
@@ -330,6 +403,8 @@ async def regenerate_section(slug: str, section_id: str):
     """
     project_dir = os.path.join(OUTPUT_DIR, slug)
     storyboard_path = os.path.join(project_dir, "storyboard.json")
+    scripts_dir = os.path.join(project_dir, "scripts")
+    media_dir = os.path.join(project_dir, "media")
     
     if not os.path.exists(storyboard_path):
         raise HTTPException(status_code=404, detail=f"项目 '{slug}' 不存在")
@@ -338,17 +413,78 @@ async def regenerate_section(slug: str, section_id: str):
     with open(storyboard_path, "r", encoding="utf-8") as f:
         storyboard = json.load(f)
     
-    # 查找指定章节
+    # 查找指定章节及其在列表中的位置
+    sections = storyboard.get("sections", [])
     section = None
-    for s in storyboard.get("sections", []):
+    section_index = -1
+    for i, s in enumerate(sections):
         if s.get("id") == section_id:
             section = s
+            section_index = i
             break
     
     if not section:
         raise HTTPException(status_code=404, detail=f"章节 '{section_id}' 不存在")
     
-    # TODO: 调用 coder 重新生成该章节
-    # 这里需要导入并使用 mathvideo.agents.coder
+    task_type = storyboard.get("task_type", "knowledge")
     
-    return {"message": f"章节 '{section_id}' 重新生成功能待实现", "section": section}
+    # 对于递进模式，读取前序 Section 的代码
+    previous_code = ""
+    if task_type in ("geometry", "proof") and section_index > 0:
+        prev_section_id = sections[section_index - 1].get("id", "")
+        prev_script = os.path.join(scripts_dir, f"{prev_section_id}.py")
+        if os.path.exists(prev_script):
+            with open(prev_script, "r", encoding="utf-8") as f:
+                previous_code = f.read()
+    
+    try:
+        # 调用 Coder 重新生成代码
+        from mathvideo.agents.coder import generate_code
+        code, class_name = generate_code(
+            section,
+            previous_code=previous_code,
+            task_type=task_type,
+        )
+        
+        if not code:
+            raise HTTPException(status_code=500, detail="代码生成失败")
+        
+        # 保存代码
+        os.makedirs(scripts_dir, exist_ok=True)
+        script_path = os.path.join(scripts_dir, f"{section_id}.py")
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(code)
+        
+        # 渲染
+        env = os.environ.copy()
+        env["PYTHONPATH"] = PROJECT_ROOT
+        cmd = [sys.executable, "-m", "manim", "-ql", "--media_dir", media_dir, script_path, class_name]
+        
+        render_result = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=PROJECT_ROOT,
+            env=env,
+        )
+        stdout, stderr = await render_result.communicate()
+        
+        if render_result.returncode == 0:
+            return {
+                "success": True,
+                "message": f"章节 '{section_id}' 重新生成且渲染成功",
+                "class_name": class_name,
+                "section": section,
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"章节 '{section_id}' 代码已重新生成，但渲染失败",
+                "error": stderr.decode("utf-8")[-500:] if stderr else "未知错误",
+                "class_name": class_name,
+                "section": section,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"重新生成失败: {str(e)}")

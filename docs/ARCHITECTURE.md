@@ -268,3 +268,44 @@ flowchart TB
 2. **颜色别名**: 定义 CYAN, NAVY 等常见颜色防止 NameError
 3. **文本智能缩放**: 只缩小过长文本,不拉伸短文本
 4. **标签定位保护**: 辅助方法自动计算正确位置
+
+## 前端架构
+
+### Web 模式
+
+```
+浏览器 (:3000) ──rewrites──→ FastAPI (:8000)
+    │                              │
+    │  /api/*  ─────────────────→  /api/*
+    │  /static/* ───────────────→  /static/* (output/)
+    │
+    └─ WebSocket ──────────────→  ws://localhost:8000/api/generate/ws/{task_id}
+```
+
+Next.js 14 App Router 全部使用 `'use client'` 渲染。`next.config.js` 通过 `rewrites` 将 API 和静态文件代理到后端。
+
+### Tauri 桌面端模式
+
+```
+┌──────────────── Tauri (Rust) ────────────────┐
+│                                              │
+│  ┌──────────┐         ┌──────────────────┐   │
+│  │ WebView  │ invoke  │  Tauri Commands   │   │
+│  │ (Next.js)│────────→│  env_checker      │   │
+│  │ :3000    │         │  backend_manager  │   │
+│  └────┬─────┘         └────────┬─────────┘   │
+│       │ HTTP/WS                │ subprocess   │
+│       ▼                        ▼              │
+│  FastAPI :8000    ← conda run -n mathvideo    │
+└──────────────────────────────────────────────┘
+```
+
+Tauri 通过 Shell 插件管理 FastAPI 子进程。`next.config.js` 检测 `TAURI_ENV_PLATFORM` 环境变量切换 `output: 'standalone'` 模式（不启用 rewrites，前端直连 `:8000`）。
+
+### 设计系统
+
+CSS 变量驱动的语义化 Token 系统，支持明 (Notion 风) / 暗 (Apple 风) 双主题。组件层采用 shadcn/ui（CVA + Radix UI），动画层使用 framer-motion。详见 [FRONTEND.md](./FRONTEND.md)。
+
+### 部署
+
+支持 Tauri 桌面安装包 (.msi / .dmg)、Web 在线部署、CLI 脚本三种模式。GitHub Actions CI/CD 自动构建 Windows + macOS 多平台安装包。详见 [DEPLOYMENT.md](./DEPLOYMENT.md)。

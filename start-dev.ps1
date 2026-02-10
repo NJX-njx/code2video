@@ -83,6 +83,18 @@ function Start-Frontend {
     Pop-Location
 }
 
+# 启动 Tauri 桌面开发模式
+function Start-Tauri {
+    Write-Host ""
+    Write-Host "${BLUE}🖥️  启动 Tauri 桌面开发模式...${NC}"
+    Write-Host "${YELLOW}💡 Tauri 会自动启动前端，你只需手动启动后端：${NC}"
+    Write-Host "   另开终端: ${YELLOW}.\start-dev.ps1 backend${NC}"
+    Write-Host ""
+    Push-Location frontend
+    npm run tauri:dev
+    Pop-Location
+}
+
 # 根据参数决定启动哪个服务
 $mode = if ($args.Count -gt 0) { $args[0] } else { "all" }
 
@@ -93,21 +105,24 @@ switch ($mode) {
     "frontend" {
         Start-Frontend
     }
+    "tauri" {
+        Start-Tauri
+    }
     "all" {
         Write-Host ""
         Write-Host "${GREEN}💡 提示: 请在两个终端分别运行:${NC}"
         Write-Host "   PowerShell 1: ${YELLOW}.\start-dev.ps1 backend${NC}"
         Write-Host "   PowerShell 2: ${YELLOW}.\start-dev.ps1 frontend${NC}"
         Write-Host ""
-        Write-Host "或者使用以下命令在后台启动后端:"
-        Write-Host "   ${YELLOW}Start-Process powershell -ArgumentList '-Command', 'python -m uvicorn backend.main:app --reload --port 8000'${NC}"
-        Write-Host "   ${YELLOW}cd frontend; npm run dev${NC}"
+        Write-Host "${GREEN}💡 Tauri 桌面模式:${NC}"
+        Write-Host "   PowerShell 1: ${YELLOW}.\start-dev.ps1 backend${NC}"
+        Write-Host "   PowerShell 2: ${YELLOW}.\start-dev.ps1 tauri${NC}"
         Write-Host ""
         Write-Host "${BLUE}现在启动后端服务器...${NC}"
         Start-Backend
     }
     default {
-        Write-Host "用法: .\start-dev.ps1 [backend|frontend|all]"
+        Write-Host "用法: .\start-dev.ps1 [backend|frontend|tauri|all]"
         exit 1
     }
 }

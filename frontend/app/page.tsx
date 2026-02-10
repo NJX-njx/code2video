@@ -137,6 +137,17 @@ export default function Home() {
                   </Card>
                 ))}
               </div>
+
+              {/* 页脚 */}
+              <footer className="pt-8 pb-4 border-t border-border/40">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>MathVideo — AI 驱动的数学教学视频生成器</span>
+                  <div className="flex items-center gap-4">
+                    <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
+                    <a href="/api/docs" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">API 文档</a>
+                  </div>
+                </div>
+              </footer>
             </motion.div>
           )}
 

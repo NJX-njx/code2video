@@ -80,20 +80,26 @@ case "${1:-all}" in
     frontend)
         start_frontend
         ;;
+    tauri)
+        echo -e "\n${BLUE}🖥️  启动 Tauri 桌面开发模式...${NC}"
+        echo -e "${YELLOW}💡 请在另一终端运行: ./start-dev.sh backend${NC}\n"
+        cd "$SCRIPT_DIR/frontend"
+        npm run tauri:dev
+        ;;
     all)
         echo -e "\n${GREEN}💡 提示: 请在两个终端分别运行:${NC}"
         echo -e "   终端 1: ${YELLOW}./start-dev.sh backend${NC}"
         echo -e "   终端 2: ${YELLOW}./start-dev.sh frontend${NC}"
         echo ""
-        echo -e "或者使用以下命令在后台启动后端:"
-        echo -e "   ${YELLOW}python -m uvicorn backend.main:app --reload --port 8000 &${NC}"
-        echo -e "   ${YELLOW}cd frontend && npm run dev${NC}"
+        echo -e "${GREEN}💡 Tauri 桌面模式:${NC}"
+        echo -e "   终端 1: ${YELLOW}./start-dev.sh backend${NC}"
+        echo -e "   终端 2: ${YELLOW}./start-dev.sh tauri${NC}"
         echo ""
         echo -e "${BLUE}现在启动后端服务器...${NC}"
         start_backend
         ;;
     *)
-        echo "用法: $0 [backend|frontend|all]"
+        echo "用法: $0 [backend|frontend|tauri|all]"
         exit 1
         ;;
 esac

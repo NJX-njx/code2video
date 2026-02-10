@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Terminal } from 'lucide-react';
+import { useEffect, useRef, useMemo } from 'react';
+import { Terminal, ClipboardList, ImageIcon, Code2, Film, Sparkles } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getWebSocketBaseUrl } from '@/lib/api';
@@ -93,8 +93,59 @@ export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogVi
   const formatTime = (date: Date) =>
     date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+  // 阶段进度检测
+  const STAGES = [
+    { key: 'plan', label: '规划', icon: ClipboardList, patterns: ['planner', '规划', '分镜', 'storyboard'] },
+    { key: 'asset', label: '资产', icon: ImageIcon, patterns: ['asset', '资产', '图标', 'icon'] },
+    { key: 'code', label: '代码', icon: Code2, patterns: ['coder', '代码', '生成代码', 'section_'] },
+    { key: 'render', label: '渲染', icon: Film, patterns: ['render', '渲染', 'manim', 'mp4'] },
+    { key: 'refine', label: '优化', icon: Sparkles, patterns: ['critic', 'refin', '优化', '视觉'] },
+  ] as const;
+
+  const currentStage = useMemo(() => {
+    const allText = logs.map(l => l.message.toLowerCase()).join(' ');
+    let lastIdx = -1;
+    let found = 0;
+    STAGES.forEach((stage, idx) => {
+      if (stage.patterns.some(p => allText.includes(p))) {
+        lastIdx = idx;
+        found = idx + 1;
+      }
+    });
+    return { active: lastIdx, completed: found };
+  }, [logs]);
+
   return (
-    <Card className="overflow-hidden">
+    <div className="space-y-3">
+      {/* 阶段进度条 */}
+      {logs.length > 0 && (
+        <div className="flex items-center gap-1">
+          {STAGES.map((stage, i) => {
+            const Icon = stage.icon;
+            const isCompleted = i < currentStage.active;
+            const isActive = i === currentStage.active;
+            return (
+              <div key={stage.key} className="flex items-center flex-1">
+                <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors w-full justify-center ${
+                  isActive ? 'bg-primary/10 text-primary' :
+                  isCompleted ? 'text-emerald-600 dark:text-emerald-400' :
+                  'text-muted-foreground/50'
+                }`}>
+                  <Icon className={`h-3.5 w-3.5 ${isActive ? 'animate-pulse' : ''}`} />
+                  <span className="hidden sm:inline">{stage.label}</span>
+                </div>
+                {i < STAGES.length - 1 && (
+                  <div className={`h-px w-3 shrink-0 ${
+                    isCompleted ? 'bg-emerald-400' : 'bg-border'
+                  }`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Card className="overflow-hidden">
       {/* macOS 风格标题栏 */}
       <div className="px-4 py-3 border-b border-border flex items-center gap-3">
         <div className="flex items-center gap-1.5">
@@ -131,5 +182,6 @@ export default function LogViewer({ taskId, logs, onLog, onStatusChange }: LogVi
         </div>
       </ScrollArea>
     </Card>
+    </div>
   );
 }

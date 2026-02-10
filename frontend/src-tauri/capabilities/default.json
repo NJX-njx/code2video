@@ -1,0 +1,22 @@
+{
+  "identifier": "default",
+  "description": "MathVideo 桌面应用默认权限",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:default",
+    "shell:allow-execute",
+    "shell:allow-open",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "dialog:allow-ask",
+    "fs:default",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "process:default",
+    "process:allow-exit",
+    "process:allow-restart"
+  ]
+}
