@@ -12,8 +12,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 # 从llm_client模块导入get_llm函数，用于创建LLM客户端
 from mathvideo.llm_client import get_llm
-# 从prompts模块导入故事板生成的提示模板
-from mathvideo.agents.prompts import PLANNER_PROMPT
+# 从 prompts 模块导入故事板生成的各类型提示模板
+from mathvideo.agents.prompts import (
+    PLANNER_PROMPT,
+    PLANNER_GEOMETRY_PROMPT,
+    PLANNER_PROOF_PROMPT,
+)
+from mathvideo.agents.skill_manager import load_skills
 from mathvideo.config import (
     GEMINI_API_KEY,
     CLAUDE_API_KEY,
@@ -211,66 +216,45 @@ def _describe_images(image_paths: List[str]) -> Optional[str]:
     return content
 
 
-def generate_storyboard(prompt: str, image_paths: Optional[List[str]] = None):
+def generate_storyboard(prompt: str, image_paths: Optional[List[str]] = None, task_type: str = "knowledge"):
     """
     为给定的输入生成故事板JSON结构
     
     功能说明：
-    本函数使用LLM（大语言模型）将数学主题/问题/描述分解为结构化的故事板。
-    故事板包含多个章节，每个章节有标题、讲义笔记和对应的动画描述。
-    这是视频生成流程的第一步，为后续的代码生成提供蓝图。
+    本函数使用LLM将数学主题/问题/描述分解为结构化的故事板。
+    根据任务类型选择不同的 Prompt 模板，生成匹配的分镜结构。
     
     参数:
-        prompt (str): 要讲解的数学主题/问题/描述
-            示例："勾股定理"、"二次函数"、"解释这张图里的三角形面积"等
+        prompt (str): 用户输入文本
         image_paths (List[str], 可选): 输入图片路径列表
+        task_type (str): 任务类型（knowledge/geometry/problem/proof）
     
     返回:
-        dict: 故事板JSON结构，包含以下字段：
-            {
-                "topic": "主题名称",
-                "sections": [
-                    {
-                        "id": "section_1",
-                        "title": "章节标题",
-                        "lecture_lines": ["笔记1", "笔记2", ...],
-                        "animations": ["动画1", "动画2", ...]
-                    },
-                    ...
-                ]
-            }
-        如果生成失败，返回None
-    
-    工作流程:
-        1. 创建LLM客户端（temperature=0.7，平衡创造性和准确性）
-        2. 从模板创建提示（包含主题信息）
-        3. 构建处理链：提示 -> LLM -> JSON解析器
-        4. 调用LLM生成故事板
-        5. 解析并返回JSON结果
-    
-    错误处理:
-        - 如果LLM调用失败，捕获异常并打印错误信息
-        - 返回None表示生成失败，调用者需要检查返回值
-    
-    使用示例:
-        storyboard = generate_storyboard("勾股定理")
-        if storyboard:
-            print(f"生成了{len(storyboard['sections'])}个章节")
-            for section in storyboard['sections']:
-                print(f"- {section['title']}")
+        dict: 故事板JSON结构，包含 task_type 字段
     """
+    # 根据任务类型选择对应的 Prompt 模板
+    prompt_map = {
+        "knowledge": PLANNER_PROMPT,
+        "geometry": PLANNER_GEOMETRY_PROMPT,
+        "problem": PLANNER_PROMPT,       # 应用题复用通用模板
+        "proof": PLANNER_PROOF_PROMPT,
+    }
+    selected_prompt = prompt_map.get(task_type, PLANNER_PROMPT)
+    
+    # 加载对应类型的 Skill 并追加到 Prompt 末尾
+    skills_text = load_skills(task_type)
+    if skills_text:
+        selected_prompt = selected_prompt + "\n" + skills_text
+    
     # 创建LLM客户端实例
-    # temperature=0.7：平衡模式，既有一定的创造性，又保持准确性
     llm = get_llm(temperature=0.7)
     # 从提示模板创建聊天提示模板
-    # PLANNER_PROMPT包含故事板生成的详细指令和格式要求
-    prompt_template = ChatPromptTemplate.from_template(PLANNER_PROMPT)
-    # 构建处理链：提示模板 -> LLM -> JSON解析器
-    # 使用管道操作符（|）连接各个处理步骤
+    prompt_template = ChatPromptTemplate.from_template(selected_prompt)
+    # 构建处理链
     chain = prompt_template | llm | JsonOutputParser()
     
     # 打印开始生成故事板的信息
-    print(f"Planning storyboard for: {prompt or '（仅图片输入）'}...")
+    print(f"Planning storyboard for: {prompt or '（仅图片输入）'} [type={task_type}]...")
     try:
         image_context = _describe_images(image_paths or []) if image_paths else None
         input_text = prompt.strip() if prompt else ""
@@ -288,6 +272,7 @@ def generate_storyboard(prompt: str, image_paths: Optional[List[str]] = None):
 
         # 附加元信息，便于回溯
         result["input_text"] = prompt
+        result["task_type"] = task_type  # 将任务类型存入 storyboard
         if image_context:
             result["image_context"] = image_context
         if image_paths:
@@ -298,7 +283,7 @@ def generate_storyboard(prompt: str, image_paths: Optional[List[str]] = None):
         # 如果生成过程中出现任何异常，尝试回退解析
         print(f"Error generating storyboard: {e}")
         try:
-            raw_prompt = PLANNER_PROMPT.format(
+            raw_prompt = selected_prompt.format(
                 input_text=input_text,
                 image_context=image_context or "无",
             )
@@ -307,6 +292,7 @@ def generate_storyboard(prompt: str, image_paths: Optional[List[str]] = None):
             fixed = _parse_storyboard_json(raw_text, llm=llm)
             if fixed:
                 fixed["input_text"] = prompt
+                fixed["task_type"] = task_type
                 if image_context:
                     fixed["image_context"] = image_context
                 if image_paths:

@@ -12,6 +12,8 @@ from mathvideo.agents.planner import generate_storyboard
 from mathvideo.agents.coder import generate_code, fix_code, refine_code
 from mathvideo.agents.asset_manager import AssetManager
 from mathvideo.agents.critic import VisualCritic
+# 导入任务类型路由器
+from mathvideo.agents.router import classify_task, get_section_mode
 from mathvideo.config import USE_VISUAL_FEEDBACK
 from mathvideo.utils import make_slug
 
@@ -112,9 +114,23 @@ def main():
             except Exception as e:
                 print(f"⚠️ 图片复制失败: {img_path} ({e})")
 
-    # 步骤1：生成故事板
-    # 调用LLM生成故事板JSON结构
-    storyboard = generate_storyboard(args.prompt.strip(), image_paths=input_image_paths)
+    # 步骤0.5：任务类型路由（在生成故事板之前先判断任务类型）
+    # 先对图片进行理解（如果有的话），因为图片内容会影响任务分类
+    image_context_for_router = None
+    if input_image_paths:
+        from mathvideo.agents.planner import _describe_images
+        image_context_for_router = _describe_images(input_image_paths)
+    
+    task_type = classify_task(args.prompt.strip(), image_context=image_context_for_router)
+    section_mode = get_section_mode(task_type)
+    print(f"📊 Section 模式: {section_mode}")
+
+    # 步骤1：生成故事板（根据任务类型选择不同的 Prompt 模板）
+    storyboard = generate_storyboard(
+        args.prompt.strip(),
+        image_paths=input_image_paths,
+        task_type=task_type,
+    )
     # 检查故事板是否生成成功
     if not storyboard:
         # 如果生成失败，打印错误信息并退出程序
@@ -143,12 +159,19 @@ def main():
     print("✅ Enhanced storyboard saved")
 
     # 步骤2：为每个章节生成代码
-    # 遍历故事板中的所有章节（如果sections不存在则使用空列表）
+    # 递进模式下，当前 Section 的代码会作为下一个 Section 的上下文
+    previous_section_code = ""  # 用于递进模式的上下文传递
+    # 遍历故事板中的所有章节
     for section in storyboard.get("sections", []):
         # 打印当前正在处理的章节ID
         print(f"\n🔄 Processing section: {section['id']}")
-        # 调用LLM生成该章节的Manim代码，返回代码字符串和类名
-        code, class_name = generate_code(section)
+        # 调用LLM生成该章节的Manim代码
+        # 递进模式下传入前序代码作为上下文
+        code, class_name = generate_code(
+            section,
+            previous_code=previous_section_code if section_mode == "sequential" else "",
+            task_type=task_type,
+        )
 
         # 检查代码是否生成成功
         if code:
@@ -160,6 +183,10 @@ def main():
                 f.write(code)
             # 打印代码保存成功的信息
             print(f"💻 Code saved to {filename}")
+            
+            # 递进模式下，保存当前 Section 的代码供下一个 Section 使用
+            if section_mode == "sequential":
+                previous_section_code = code
 
             # 步骤3：如果用户指定了--render参数，则渲染视频
             if args.render:

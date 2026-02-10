@@ -7,75 +7,60 @@ from langchain_core.output_parsers import StrOutputParser
 # 从llm_client模块导入get_llm函数，用于创建LLM客户端
 from mathvideo.llm_client import get_llm
 # 从prompts模块导入代码生成和修复的提示模板
-from mathvideo.agents.prompts import CODER_PROMPT, FIX_CODE_PROMPT, REFINE_CODE_PROMPT
+from mathvideo.agents.prompts import CODER_PROMPT, CODER_SEQUENTIAL_PROMPT, FIX_CODE_PROMPT, REFINE_CODE_PROMPT
+from mathvideo.agents.skill_manager import load_skills
 
-def generate_code(section_data: dict):
+def generate_code(section_data: dict, previous_code: str = "", task_type: str = "knowledge"):
     """
     为特定章节生成Manim Python代码
     
     功能说明：
     本函数使用LLM根据章节的故事板数据生成完整的Manim动画代码。
-    生成的代码是一个完整的Python类，继承自TeachingScene，包含construct()方法。
-    这是视频生成流程的第二步，将故事板转换为可执行的动画代码。
+    对于递进式任务（geometry/proof），会将前序 Section 的完整代码作为上下文传入。
     
     参数:
-        section_data (dict): 章节数据字典，包含以下字段：
-            - "id": 章节ID（如"section_1"）
-            - "title": 章节标题
-            - "lecture_lines": 讲义笔记列表
-            - "animations": 动画描述列表
+        section_data (dict): 章节数据字典
+        previous_code (str): 前序 Section 的完整代码（仅递进模式使用）
+        task_type (str): 任务类型，用于选择 Prompt 模板和加载 Skill
     
     返回:
         tuple: (code, class_name) 元组
-            - code (str): 生成的Python代码字符串，如果失败则为None
-            - class_name (str): 生成的场景类名（如"Section1Scene"），如果失败则为None
-    
-    工作流程:
-        1. 创建LLM客户端（temperature=0.5，较低温度确保代码准确性）
-        2. 从模板创建提示（包含章节信息）
-        3. 构建处理链：提示 -> LLM -> 字符串解析器
-        4. 调用LLM生成代码
-        5. 清理代码（移除markdown标记）
-        6. 重命名类名为基于章节ID的唯一名称
-        7. 返回代码和类名
-    
-    代码清理:
-        - 移除markdown代码块标记（```python和```）
-        - 确保类名唯一（基于章节ID）
-    
-    使用示例:
-        section = {
-            "id": "section_1",
-            "title": "勾股定理介绍",
-            "lecture_lines": ["定义", "证明"],
-            "animations": ["显示三角形", "显示证明过程"]
-        }
-        code, class_name = generate_code(section)
-        if code:
-            print(f"生成了类: {class_name}")
     """
     # 创建LLM客户端实例
-    # temperature=0.5：较低温度，确保代码生成的准确性和一致性
-    # 代码生成需要精确性，所以使用较低温度
-    llm = get_llm(temperature=0.5) # Lower temp for code
-    # 从代码生成提示模板创建聊天提示模板
-    # CODER_PROMPT包含详细的代码生成指令、格式要求和示例
-    prompt = ChatPromptTemplate.from_template(CODER_PROMPT)
-    # 构建处理链：提示模板 -> LLM -> 字符串解析器
-    # 使用管道操作符（|）连接各个处理步骤
+    llm = get_llm(temperature=0.5)
+    
+    # 根据任务类型和是否有前序代码选择 Prompt 模板
+    is_sequential = (task_type in ("geometry", "proof")) and bool(previous_code)
+    base_prompt = CODER_SEQUENTIAL_PROMPT if is_sequential else CODER_PROMPT
+    
+    # 加载对应类型的 Skill 并追加到 Prompt
+    skills_text = load_skills(task_type)
+    if skills_text:
+        base_prompt = base_prompt + "\n" + skills_text
+    
+    prompt = ChatPromptTemplate.from_template(base_prompt)
     chain = prompt | llm | StrOutputParser()
     
     # 打印开始生成代码的信息
-    print(f"Generating code for section: {section_data['title']}...")
+    mode_label = "递进模式" if is_sequential else "独立模式"
+    print(f"Generating code for section: {section_data['title']} [{mode_label}]...")
     
     try:
-        # 调用处理链，传入章节数据
-        # invoke()方法会执行整个链：格式化提示 -> 调用LLM -> 提取字符串
-        code = chain.invoke({
-            "title": section_data['title'],  # 章节标题
-            "lecture_lines": section_data['lecture_lines'],  # 讲义笔记列表
-            "animations": section_data['animations']  # 动画描述列表
-        })
+        # 构建调用参数
+        invoke_params = {
+            "title": section_data['title'],
+            "lecture_lines": section_data['lecture_lines'],
+            "animations": section_data['animations'],
+        }
+        
+        # 递进模式额外传入前序代码和对象信息
+        if is_sequential:
+            invoke_params["previous_code"] = previous_code
+            invoke_params["inherited_objects"] = section_data.get("inherited_objects", [])
+            invoke_params["new_objects"] = section_data.get("new_objects", [])
+        
+        # 调用处理链
+        code = chain.invoke(invoke_params)
         
         # 清理代码：移除markdown代码块标记（```python和```）
         code = clean_code(code)
