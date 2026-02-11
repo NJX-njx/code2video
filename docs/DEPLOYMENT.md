@@ -16,10 +16,9 @@
 
 | 依赖 | 版本 | 安装方式 | 用途 |
 |------|------|---------|------|
-| Conda | Miniconda 或 Anaconda | [miniconda.io](https://docs.conda.io/en/latest/miniconda.html) | Python 环境管理 |
-| Python | 3.10+ | `conda create -n mathvideo python=3.10` | 核心运行时 |
-| ffmpeg | 6+ | `conda install ffmpeg` 或系统安装 | Manim 视频合成 |
-| pdflatex | 任意 | 可选，MiKTeX / TeX Live | LaTeX 公式渲染（有自动回退） |
+| Python | 3.10+ | `.venv` 或 Conda 环境 | 核心运行时 |
+| ffmpeg | 6+ | 系统安装 或 `conda install ffmpeg` | Manim 视频合成 |
+| pdflatex | 任意 | 可选，MiKTeX / TeX Live | LaTeX 公式渲染（有完善的自动回退机制） |
 
 ### Tauri 桌面端额外依赖
 
@@ -32,18 +31,42 @@
 
 ### Python 环境设置
 
-```bash
-# 创建 conda 环境
-conda create -n mathvideo python=3.10 -y
-conda activate mathvideo
+**方式一：venv 虚拟环境（推荐）**
 
-# 安装 Python 依赖
+```bash
+# 创建虚拟环境
+python -m venv .venv
+
+# 激活（Windows）
+.venv\Scripts\activate
+# 激活（macOS / Linux）
+source .venv/bin/activate
+
+# 安装依赖
 pip install -r requirements.txt
 
 # 验证
 python -c "import manim; print(manim.__version__)"
 ffmpeg -version
 ```
+
+**方式二：Conda 环境**
+
+```bash
+# 创建 conda 环境
+conda create -n mathvideo python=3.10 -y
+conda activate mathvideo
+
+# 安装 Python 依赖
+conda install -c conda-forge manim ffmpeg -y
+pip install -r requirements.txt
+
+# 验证
+python -c "import manim; print(manim.__version__)"
+ffmpeg -version
+```
+
+> **Python 环境自动检测（Web 模式）**: 后端 `_detect_python_command()` 按优先级检测 `.venv/Scripts/python.exe` → `conda run -n mathvideo python` → `sys.executable`
 
 ### 环境变量 (.env)
 
@@ -177,7 +200,10 @@ media-src 'self' http://localhost:8000;
 ## 4. CLI 模式
 
 ```bash
-conda activate mathvideo
+# 激活环境
+.venv\Scripts\activate          # venv (Windows)
+source .venv/bin/activate        # venv (macOS/Linux)
+conda activate mathvideo         # 或 conda
 
 # 基本用法
 python -m mathvideo "勾股定理" --render
@@ -186,7 +212,7 @@ python -m mathvideo "勾股定理" --render
 python -m mathvideo "题目描述" --image ./img.png --render
 
 # 指定输出目录
-python -m mathvideo "主题" --render --output ./custom_output/
+python -m mathvideo "主题" --render --output-dir ./output/my-project
 ```
 
 输出目录结构：

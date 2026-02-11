@@ -2,6 +2,96 @@
 
 > 记录项目重要的架构变更和功能改进
 
+## 2026-02-11: 稳定性与 UI 改进（v1.2）
+
+### Bug 修复
+
+#### 1. 后端 API 307 重定向循环
+
+Next.js `rewrites` 代理层可能剥离尾斜杠，导致 FastAPI 返回 307 重定向形成循环，前端报 "Failed to fetch"。
+
+**修复**: 所有 POST 路由添加双装饰器 `@router.post("")` + `@router.post("/")`，兼容有/无尾斜杠请求。
+
+#### 2. 子进程 Shell 解析破坏数学输入（根因）
+
+用户输入的数学表达式含 `$`、`>`、`^`、`()` 等字符，`create_subprocess_shell()` 通过 cmd.exe 执行时会将这些解释为 shell 操作符，导致命令被截断，`--output-dir` 和 `--render` 参数丢失。
+
+**修复**: 
+- 将 `create_subprocess_shell()` 改为 `create_subprocess_exec()`，直接传递参数列表，完全绕过 shell 解析
+- `_detect_python_command()` 返回 `list` 而非 `str`
+- 移除不再需要的 `_quote_arg()` 和 `shlex` 导入
+- 新增 `PYTHONUTF8=1` 环境变量确保子进程 UTF-8 输出
+
+#### 3. CLI Unicode 编码崩溃
+
+Windows 默认 GBK 编码无法输出 emoji（🚀），`print()` 抛出 `UnicodeEncodeError`。
+
+**修复**: 在 `cli.py` 的 `main()` 函数入口添加 `sys.stdout.reconfigure(encoding='utf-8', errors='replace')`。
+
+#### 4. Web 模式下目录重命名导致双项目
+
+CLI 在 Web 模式下仍执行目录重命名，导致后端找不到原始输出目录。
+
+**修复**: 添加 `and not args.output_dir` 条件，当后端通过 `--output-dir` 指定路径时跳过重命名。
+
+#### 5. 合并视频文件名不匹配
+
+前端 `ProjectPageClient.tsx` 使用 `final_merged.mp4`，但 CLI 生成文件为 `final_video.mp4`。
+
+**修复**: 前端统一为 `final_video.mp4`。
+
+#### 6. 动画区可见分割线
+
+`setup_layout()` 在讲义区和动画区之间绘制了一条可见的竖线 (`Line` 对象)，影响美观。
+
+**修复**: 移除 `Line` 对象的创建，仅保留逻辑上的 `divider_x` 坐标值。
+
+#### 7. LaTeX 回退分数渲染错误
+
+旧的 `MathTex` 回退实现用简单的字符串替换（`replace("\\", "")` → `replace("frac", "/")`），导致 `\frac{9}{x-3}` 变成 `/9x-3`。
+
+**修复**: 完整重写 `MathTex` 回退类：
+- 结构化正则解析器，支持 3 层嵌套大括号
+- 正确处理顺序：`^{}`/`_{}` → `\sqrt{}` → `\frac{}{}`
+- 完整的 Unicode 符号映射表（希腊字母、运算符、关系符、箭头等）
+- 对 `DecimalNumber`、`NumberLine` 等内部引用原始 `MathTex` 的组件进行深度补丁
+
+#### 8. LaTeX Deep Monkey Patch
+
+Manim 的 `DecimalNumber.__init__` 捕获了原始 `MathTex` 引用（在模块导入时），导致 monkey patch 未完全生效。
+
+**修复**: 补丁阶段检测 `DecimalNumber.__init__` 中的原始引用并替换。
+
+### UI 改进
+
+#### 1. 进度条与阶段追踪
+
+LogViewer 新增 5 阶段进度条（规划 → 资产 → 代码 → 渲染 → 合并），当未启用渲染时，跳过的阶段显示删除线样式。
+
+#### 2. 条件完成消息
+
+首页根据实际渲染状态显示不同完成消息：
+- 已渲染: "✅ 视频已生成！" + 视频播放入口
+- 未渲染: "✅ 代码已生成（未渲染视频）" + 分镜查看入口
+
+#### 3. 渲染状态检测
+
+后端新增 `_detect_rendered_video()` 函数，扫描 `media/videos/` 目录检测实际渲染的 .mp4 文件，代替仅依赖 `--render` 参数判断。
+
+### 修改的文件
+
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| `backend/api/generate.py` | 修改 | `create_subprocess_exec`、双路由装饰器、`_detect_rendered_video`、`PYTHONUTF8=1` |
+| `mathvideo/cli.py` | 修改 | UTF-8 编码修复、`--output-dir` 参数、Web 模式跳过重命名 |
+| `mathvideo/manim_base.py` | 修改 | 移除可见分割线、重写 MathTex 回退、Deep Monkey Patch |
+| `frontend/app/page.tsx` | 修改 | 条件完成消息、`rendered` 状态 |
+| `frontend/app/projects/[slug]/ProjectPageClient.tsx` | 修改 | 视频文件名修正 |
+| `frontend/components/LogViewer.tsx` | 修改 | 5 阶段进度条、跳过阶段样式 |
+| `frontend/lib/types.ts` | 修改 | 新增 `CompletionData` 接口 |
+
+---
+
 ## 2026-02-10: 多项改进（v1.1）
 
 ### 新增功能

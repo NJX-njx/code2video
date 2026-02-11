@@ -339,11 +339,15 @@ app = FastAPI(title="MathVideo API", version="1.0.0")
 
 **关键实现细节**:
 - POST 请求支持 `application/json` 和 `multipart/form-data`（图片上传）
+- **双路由装饰器**: `@router.post("")` + `@router.post("/")`，避免 Next.js rewrites 代理层导致的 307 尾斜杠重定向循环
 - 生成任务通过 `asyncio.create_task()` 异步执行
 - `run_generation()` 等待最多 5 秒让 WebSocket 连接建立，解决竞态条件
-- 子进程通过 `asyncio.create_subprocess_shell` 执行 CLI Pipeline
+- **子进程安全**: 使用 `asyncio.create_subprocess_exec()` 直接传递参数列表，完全绕过 shell 解析，避免数学符号 `$`、`>`、`^`、`()` 被 cmd.exe 误解为 shell 操作符
+- **Python 环境自动检测**: `_detect_python_command()` 返回参数**列表**（而非字符串），按优先级检测 `.venv/Scripts/python.exe` → `conda run -n mathvideo python` → `sys.executable`
+- **环境变量**: 设置 `PYTHONUTF8=1` 确保子进程 UTF-8 输出
 - 实时读取 stdout，按 emoji 判断日志级别（✅=success, ❌=error, ⚠️=warning）
-- CLI 可能重命名项目目录（AI 生成名称），后端通过扫描 `output/` 最新目录检测实际 slug
+- `--output-dir` 参数传递给 CLI，避免目录重命名导致路径不一致
+- **渲染检测**: `_detect_rendered_video()` 扫描 `media/videos/` 目录检测实际渲染的 .mp4 文件，而非仅依赖 `--render` 参数
 
 #### 项目 API (`backend/api/projects.py`)
 
@@ -395,22 +399,23 @@ app = FastAPI(title="MathVideo API", version="1.0.0")
 
 ```
 main()
-├── 1. 解析命令行参数（prompt, --image, --render）
-├── 2. 生成初始 slug，创建输出目录
-├── 3. 处理输入图片（复制到 inputs/）
-├── 4. Router 分类任务类型
-├── 5. Planner 生成 storyboard.json
-├── 6. 用 AI topic 重命名项目目录
-├── 7. AssetManager 分析/下载资产
-├── 8. 遍历 sections：
+├── 1. sys.stdout.reconfigure(encoding='utf-8')   # Windows GBK 兑容
+├── 2. 解析命令行参数（prompt, --image, --render, --output-dir）
+├── 3. 生成初始 slug，创建输出目录
+├── 4. 处理输入图片（复制到 inputs/）
+├── 5. Router 分类任务类型
+├── 6. Planner 生成 storyboard.json
+├── 7. 用 AI topic 重命名项目目录（仅直接 CLI 调用，Web 模式下跳过）
+├── 8. AssetManager 分析/下载资产
+├── 9. 遍历 sections：
 │   ├── Coder 生成代码
 │   ├── 保存 scripts/section_N.py
 │   ├── (递进模式) 传递代码给下一 Section
 │   └── (--render) Manim 渲染
 │       ├── 成功 → Critic → Refiner → 记录视频路径
 │       └── 失败 → fix_code → 重试（最多3次）
-├── 9. 合并所有分镜视频 → final_video.mp4
-└── 10. 输出完成信息
+├── 10. 合并所有分镜视频 → final_video.mp4
+└── 11. 输出完成信息
 ```
 
 **视频合并**: `_merge_videos()` 使用 PyAV（Manim 内置依赖）的 concat demuxer + decode/encode 方式拼接，CLI ffmpeg 作为回退方案。

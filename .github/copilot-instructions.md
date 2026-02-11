@@ -100,7 +100,7 @@ class Section1Scene(TeachingScene):
 - **标签定位**: 先 `place_in_area` 放几何体，再用 `self.add_side_label(polygon, side_idx, text)` / `self.add_vertex_label()` / `self.add_right_angle_mark()` 添加标签。**禁止**先 `next_to` 再 `place_at_grid`（会覆盖位置）
 - **类名约定**: `section_data['id']` 如 `"section_1"` → 类名 `Section1Scene`（`coder.py` 自动重命名）
 - **颜色**: 仅用 `manim_base.py` 预定义的别名 (`LIGHT_BLUE`, `LIGHT_YELLOW`, `CYAN`, `NAVY`, `BROWN`, `VIOLET` 等)
-- **LaTeX 回退**: `manim_base.py` 检测 `pdflatex` 可用性，不可用时猴子补丁 `manim.MathTex` 为 `Text` 子类。直接使用 `MathTex`，无需手动处理
+- **LaTeX 回退**: `manim_base.py` 检测 `pdflatex` 可用性，不可用时猴子补丁 `manim.MathTex` 为 `Text` 子类。内置结构化正则解析器，支持 `\frac{}{}`、`\sqrt{}`、`^{}`/`_{}`、希腊字母等常见 LaTeX 语法，3 层嵌套大括号。同时对 `DecimalNumber`、`NumberLine` 等引用原始 `MathTex` 的内部组件进行深度补丁。直接使用 `MathTex`，无需手动处理
 - **LLM 兼容性**: `TeachingScene` 提供多个别名方法（`grid_to_coords`, `grid_anchor`, `get_grid_position`）和 `VGroup.arrange_in_circle` 猴子补丁，提高 LLM 生成代码的成功率
 
 ### 错误修复循环
@@ -167,7 +167,7 @@ curl http://localhost:8000/docs   # Swagger UI
 
 | 文件 | 说明 |
 |------|------|
-| `mathvideo/manim_base.py` | **核心 937 行**: TeachingScene、Grid 定位、颜色别名、LaTeX 回退、LLM 猴子补丁 |
+| `mathvideo/manim_base.py` | **核心 1000+ 行**: TeachingScene、Grid 定位、颜色别名、LaTeX 结构化回退（支持 \frac/\sqrt/上下标）、Deep Monkey Patch、LLM 猴子补丁 |
 | `mathvideo/agents/prompts.py` | 所有 LLM prompt 模板（Planner/Coder/Fix/Asset/Critic/Refine） |
 | `mathvideo/agents/router.py` | Router Agent — 任务类型分类（knowledge/geometry/problem/proof） |
 | `mathvideo/agents/skill_manager.py` | Skill 加载器 — 按类型注入技能到 Prompt |

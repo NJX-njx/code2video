@@ -125,6 +125,8 @@ frontend/
 ### LogViewer
 - macOS 风格标题栏 (红/黄/绿圆点)
 - WebSocket 实时日志，按 emoji 前缀分级着色
+- **5 阶段进度条**: 规划(✅) → 资产(✅) → 代码(✅) → 渲染(✅) → 合并(✅)
+- **未渲染模式**: 当 `rendered === false` 时，跳过的阶段（渲染、合并）显示删除线样式
 - 自动滚动到底部，`animate-fade-in` 新条目动画
 
 ### ProjectList
@@ -189,8 +191,19 @@ frontend/
 - `VideoInfo`, `ScriptInfo` — 媒体资源
 - `GenerateRequest`, `GenerateResponse` — 生成任务
 - `LogMessage`, `GenerateStatus` — WebSocket 消息
+- `CompletionData` — 完成状态（`{ slug?: string; rendered?: boolean; error?: string }`）
 - `CritiqueResponse`, `RefineRequest`, `RefineResponse` — 优化流程
 - `TabType` — 页面标签类型
+
+### 完成状态处理
+
+首页 (`app/page.tsx`) 根据 WebSocket 返回的 `rendered` 字段显示不同的完成消息：
+- `rendered === true`: “✅ 视频已生成！”，显示视频播放入口
+- `rendered === false`: “✅ 代码已生成（未渲染视频）”，仅显示分镜查看入口
+
+### 视频文件名
+
+项目详情页 (`ProjectPageClient.tsx`) 使用 `final_video.mp4` 作为合并视频文件名，与 CLI 输出保持一致。
 
 ## 开发
 

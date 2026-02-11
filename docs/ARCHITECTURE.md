@@ -162,11 +162,13 @@ flowchart TB
 
 > v1.1 新增
 
-**触发**: Planner 生成 storyboard 后
+**触发**: Planner 生成 storyboard 后（仅 CLI 直接调用时）
 
 **处理**: 用 storyboard 的 AI 生成 `topic` 字段重命名输出目录
 
 **效果**: `已知等边三角形ABC-273bcf` → `等边三角形中的对称与交点构造-75bd10`
+
+> **注意**: Web 模式下后端通过 `--output-dir` 指定输出目录，CLI 会跳过重命名以避免路径不一致。
 
 ### 3. 资产阶段 (Asset Manager)
 
@@ -311,10 +313,12 @@ mathvideo/skills/
 
 ### 防错机制
 
-1. **LaTeX 回退**: 无 LaTeX 时自动使用 Text 替代 MathTex
-2. **颜色别名**: 定义 CYAN, NAVY 等常见颜色防止 NameError
-3. **文本智能缩放**: 只缩小过长文本,不拉伸短文本
-4. **标签定位保护**: 辅助方法自动计算正确位置
+1. **LaTeX 回退**: 无 `pdflatex` 时自动 monkey patch `MathTex` 为 `Text` 子类，内置结构化正则解析器支持 `\frac{}{}`、`\sqrt{}`、上下标 `^{}`/`_{}`、希腊字母等常见 LaTeX 语法，支持 3 层嵌套大括号
+2. **Deep Monkey Patch**: 对 `DecimalNumber`、`NumberLine` 等 Manim 内部引用原始 `MathTex` 的组件进行深度补丁，确保回退机制全局生效
+3. **颜色别名**: 定义 `CYAN`, `NAVY`, `BROWN`, `VIOLET` 等常见颜色防止 NameError
+4. **文本智能缩放**: 只缩小过长文本，不拉伸短文本
+5. **标签定位保护**: 辅助方法自动计算正确位置
+6. **LLM 兼容别名**: `grid_to_coords`、`grid_anchor`、`get_grid_position` 等多名称映射同一方法
 
 ## 前端架构
 
@@ -329,7 +333,9 @@ mathvideo/skills/
     └─ WebSocket ──────────────→  ws://localhost:8000/api/generate/ws/{task_id}
 ```
 
-Next.js 14 App Router 全部使用 `'use client'` 渲染。`next.config.js` 通过 `rewrites` 将 API 和静态文件代理到后端。
+Next.js App Router 全部使用 `'use client'` 渲染。`next.config.js` 通过 `rewrites` 将 API 和静态文件代理到后端。
+
+> **注意**: `reactStrictMode` 已关闭，避免 WebSocket 在开发模式下双重连接。后端 API 路由使用双装饰器（`@router.post("")` + `@router.post("/")`）防止 Next.js 代理层导致的 307 重定向循环。
 
 ### Tauri 桌面端模式
 
