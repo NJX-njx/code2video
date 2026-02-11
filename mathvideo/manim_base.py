@@ -182,6 +182,53 @@ if not LATEX_AVAILABLE:
     manim.MathTex = MathTex
     # 同时也替换Tex类（以防万一，因为有些代码可能使用Tex而不是MathTex）
     manim.Tex = MathTex
+    
+    # ========================================================================
+    # 深度猴子补丁：替换子模块中的 MathTex/Tex 引用
+    # ========================================================================
+    # 仅替换 manim.MathTex 不够，因为内部子模块（如 tex_mobject、numbers、
+    # number_line）在类定义时已经通过默认参数捕获了原始 MathTex 的引用。
+    # 例如 NumberLine(label_constructor=MathTex) 和 DecimalNumber(mob_class=MathTex)
+    # 都在类定义时固定引用，普通猴子补丁无法覆盖。
+    #
+    # 策略：保存原始类引用，在 DecimalNumber.__init__ 中检测 mob_class 是否
+    # 仍指向原始 MathTex/Tex 类，如果是则替换为我们的 Text 回退版本。
+    
+    import manim
+    import manim.mobject.text.tex_mobject as _tex_mod
+    import manim.mobject.text.numbers as _num_mod
+    
+    # 保存原始类引用（用于后续比对）
+    _OriginalMathTex = _tex_mod.MathTex
+    _OriginalTex = _tex_mod.Tex
+    _OriginalSingleStringMathTex = _tex_mod.SingleStringMathTex
+    
+    # 替换顶层和子模块引用
+    manim.MathTex = MathTex
+    manim.Tex = MathTex
+    _tex_mod.MathTex = MathTex
+    _tex_mod.Tex = MathTex
+    if hasattr(_num_mod, 'MathTex'):
+        _num_mod.MathTex = MathTex
+    
+    # 修复 DecimalNumber 的 mob_class 参数
+    # NumberLine.get_number_mobject() 会显式传递 mob_class=self.label_constructor
+    # 而 self.label_constructor 在 NumberLine 类定义时已捕获原始 MathTex 引用
+    # 所以这里需要检测 mob_class 的值是否为原始 MathTex 类并替换
+    from manim.mobject.text.numbers import DecimalNumber
+    _orig_decimal_init = DecimalNumber.__init__
+    
+    def _patched_decimal_init(self, number=0, **kwargs):
+        mc = kwargs.get('mob_class')
+        # 如果 mob_class 是原始的 MathTex/Tex/SingleStringMathTex（需要 LaTeX），
+        # 替换为我们基于 Text 的回退版本
+        if mc is _OriginalMathTex or mc is _OriginalTex or mc is _OriginalSingleStringMathTex:
+            kwargs['mob_class'] = MathTex
+        elif mc is None or 'mob_class' not in kwargs:
+            kwargs['mob_class'] = MathTex
+        _orig_decimal_init(self, number, **kwargs)
+    
+    DecimalNumber.__init__ = _patched_decimal_init
 
 class TeachingScene(Scene):
     """

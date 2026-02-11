@@ -100,46 +100,39 @@ export default function LogViewer({ taskId, logs, status, rendered, onLog, onSta
     { key: 'plan', label: '规划', icon: ClipboardList, patterns: ['planner', '规划', '分镜', 'storyboard'] },
     { key: 'asset', label: '资产', icon: ImageIcon, patterns: ['asset', '资产', '图标', 'icon'] },
     { key: 'code', label: '代码', icon: Code2, patterns: ['coder', '代码', '生成代码', 'section_'] },
-    { key: 'render', label: '渲染', icon: Film, patterns: ['render', '渲染', 'manim', 'mp4'] },
-    { key: 'refine', label: '优化', icon: Sparkles, patterns: ['critic', 'refin', '优化', '视觉'] },
+    { key: 'render', label: '渲染', icon: Film, patterns: ['render', '渲染', 'manim', 'mp4'], requiresRender: true },
+    { key: 'refine', label: '优化', icon: Sparkles, patterns: ['critic', 'refin', '优化', '视觉'], requiresRender: true },
   ] as const;
-
-  // 根据任务完成状态和是否渲染来决定显示哪些阶段
-  const visibleStages = useMemo(() => {
-    // 完成后且未渲染：隐藏渲染和优化阶段
-    if (status === 'completed' && rendered === false) {
-      return STAGES.filter(s => s.key !== 'render' && s.key !== 'refine');
-    }
-    return [...STAGES];
-  }, [status, rendered]);
 
   const currentStage = useMemo(() => {
     const allText = logs.map(l => l.message.toLowerCase()).join(' ');
     let lastIdx = -1;
-    visibleStages.forEach((stage, idx) => {
+    STAGES.forEach((stage, idx) => {
       if (stage.patterns.some(p => allText.includes(p))) {
         lastIdx = idx;
       }
     });
-    // 如果任务已完成, 标记所有可见阶段为完成
-    if (status === 'completed') {
-      return { active: -1, completed: visibleStages.length };
-    }
-    return { active: lastIdx, completed: lastIdx >= 0 ? lastIdx : 0 };
-  }, [logs, status, visibleStages]);
+    return lastIdx;
+  }, [logs]);
 
   return (
     <div className="space-y-3">
       {/* 阶段进度条 */}
       {logs.length > 0 && (
         <div className="flex items-center gap-1">
-          {visibleStages.map((stage, i) => {
+          {STAGES.map((stage, i) => {
             const Icon = stage.icon;
-            const isCompleted = i < currentStage.completed;
-            const isActive = i === currentStage.active;
+            const needsRender = 'requiresRender' in stage && stage.requiresRender;
+            // 判断该阶段是否被跳过（需要渲染但实际未渲染）
+            const isSkipped = status === 'completed' && rendered === false && needsRender;
+            // 完成态：所有非跳过阶段标记为完成
+            const isCompleted = status === 'completed' ? !isSkipped : i < currentStage;
+            // 运行态：当前阶段高亮
+            const isActive = status !== 'completed' && i === currentStage;
             return (
               <div key={stage.key} className="flex items-center flex-1">
                 <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors w-full justify-center ${
+                  isSkipped ? 'text-muted-foreground/30 line-through' :
                   isActive ? 'bg-primary/10 text-primary' :
                   isCompleted ? 'text-emerald-600 dark:text-emerald-400' :
                   'text-muted-foreground/50'
@@ -147,8 +140,9 @@ export default function LogViewer({ taskId, logs, status, rendered, onLog, onSta
                   <Icon className={`h-3.5 w-3.5 ${isActive ? 'animate-pulse' : ''}`} />
                   <span className="hidden sm:inline">{stage.label}</span>
                 </div>
-                {i < visibleStages.length - 1 && (
+                {i < STAGES.length - 1 && (
                   <div className={`h-px w-3 shrink-0 ${
+                    isSkipped ? 'bg-border/50' :
                     isCompleted ? 'bg-emerald-400' : 'bg-border'
                   }`} />
                 )}
