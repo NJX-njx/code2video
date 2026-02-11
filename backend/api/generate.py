@@ -235,10 +235,13 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         if process.returncode == 0:
             # CLI 可能已将目录重命名为 AI 生成的名称，需要检测实际 slug
             actual_slug = _detect_renamed_slug(task_id)
+            rendered = _detect_rendered_video(actual_slug, render)
             await broadcast_log(task_id, "✅ 项目生成完成!", "success")
+            if render and not rendered:
+                await broadcast_log(task_id, "⚠️ 未检测到渲染视频输出，请检查渲染日志", "warning")
             await broadcast_status(task_id, "completed", {
                 "slug": actual_slug,
-                "rendered": render,  # 告知前端是否执行了渲染
+                "rendered": rendered,
             })
         else:
             await broadcast_log(task_id, f"❌ 生成过程出错，退出码: {process.returncode}", "error")
@@ -295,6 +298,26 @@ def _detect_renamed_slug(task_id: str) -> str:
         return candidates[0][0]
     except OSError:
         return task_id
+
+
+def _detect_rendered_video(slug: str, requested: bool) -> bool:
+    if not requested:
+        return False
+
+    base_dir = os.path.join(OUTPUT_DIR, slug)
+    final_video = os.path.join(base_dir, "final_video.mp4")
+    if os.path.exists(final_video):
+        return True
+
+    media_dir = os.path.join(base_dir, "media", "videos")
+    if not os.path.isdir(media_dir):
+        return False
+
+    for root, _dirs, files in os.walk(media_dir):
+        for name in files:
+            if name.lower().endswith(".mp4"):
+                return True
+    return False
 
 
 @router.post("", response_model=GenerateResponse)
