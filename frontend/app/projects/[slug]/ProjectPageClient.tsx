@@ -89,7 +89,7 @@ export default function ProjectPageClient() {
   }, [scripts, selectedSection, isAllView]);
 
   // 总视频路径
-  const finalVideoPath = `${getStaticBaseUrl()}/${slug}/final_merged.mp4`;
+  const finalVideoPath = `${getStaticBaseUrl()}/${slug}/final_video.mp4`;
 
   // --- 加载状态 ---
   if (loading) {

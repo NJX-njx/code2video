@@ -101,66 +101,133 @@ if not LATEX_AVAILABLE:
         工作原理：
         1. 接收LaTeX字符串（可能包含多个字符串）
         2. 移除LaTeX分隔符（如$...$）
-        3. 将常见的LaTeX命令替换为Unicode符号
-        4. 清理LaTeX语法（移除反斜杠、大括号等）
-        5. 使用Text类渲染最终的文本
-        
-        注意：
-        - 这是一个近似方案，无法完美渲染复杂的数学公式
-        - 建议安装LaTeX以获得最佳的数学公式渲染效果
-        - 支持的LaTeX命令有限，复杂公式可能显示不正确
+        3. 使用正则表达式结构化解析 \frac{a}{b} → (a)/(b) 等复杂命令
+        4. 将常见的LaTeX命令替换为Unicode符号
+        5. 清理残余LaTeX语法
+        6. 使用Text类渲染最终的文本
         """
         def __init__(self, *tex_strings, **kwargs):
-            """
-            初始化MathTex回退类
+            import re
             
-            参数:
-                *tex_strings: 可变数量的LaTeX字符串参数
-                **kwargs: 传递给Text类的其他关键字参数（如font_size、color等）
-            
-            处理流程:
-                1. 将所有LaTeX字符串连接成一个完整的文本
-                2. 移除LaTeX分隔符和转义字符
-                3. 替换常见LaTeX命令为Unicode符号
-                4. 清理LaTeX语法结构
-                5. 调用父类Text的构造函数进行渲染
-            """
-            # 步骤1：将所有输入的LaTeX字符串用空格连接成一个完整文本
+            # 步骤1：将所有输入的LaTeX字符串用空格连接
             full_text = " ".join(tex_strings)
-            # 步骤2：移除LaTeX的数学模式分隔符（$...$）
+            # 步骤2：移除LaTeX的数学模式分隔符
             full_text = full_text.replace("$", "")
-            # 步骤3：移除LaTeX的反斜杠转义字符（粗略清理）
-            # 注意：这是一个简单的替换，可能会误删一些需要的反斜杠
-            full_text = full_text.replace("\\", "") # Crude cleanup
             
-            # 步骤4：将常见的LaTeX数学命令映射为Unicode符号
-            # 这样可以提高可读性，即使没有LaTeX也能理解数学表达式
-            replacements = {
-                "cdot": "·",      # 点乘符号
-                "times": "×",     # 乘号
-                "frac": "/",      # 分数（转换为斜杠）
-                "sqrt": "√",      # 平方根符号
-                "pi": "π",        # 圆周率
-                "theta": "θ",     # 希腊字母theta
-                "alpha": "α",     # 希腊字母alpha
-                "beta": "β",      # 希腊字母beta
-                "approx": "≈",    # 约等于
-                "neq": "≠",       # 不等于
-                "leq": "≤",       # 小于等于
-                "geq": "≥",       # 大于等于
-                "^{2}": "²",      # 上标2（平方）
-                "_{2}": "₂",      # 下标2
+            # 步骤3：结构化解析复杂LaTeX命令（在移除反斜杠之前！）
+            
+            # 匹配一对大括号及其内容的正则模式（支持最多3层嵌套）
+            # 例如 {a+{b^{2}}} 能正确匹配
+            _b1 = r'[^{}]*'  # 无嵌套
+            _b2 = r'[^{}]*(?:\{' + _b1 + r'\}' + r'[^{}]*)*'  # 1层嵌套
+            _b3 = r'[^{}]*(?:\{' + _b2 + r'\}' + r'[^{}]*)*'  # 2层嵌套
+            _brace = r'\{(' + _b3 + r')\}'  # 3层嵌套（含外层大括号）
+            
+            # 3a: 先处理内层结构，再处理外层
+            # 先处理 ^{} 和 _{} （最内层）
+            for _ in range(3):
+                full_text = re.sub(r'\^' + _brace, lambda m: f'^({m.group(1)})', full_text)
+                full_text = re.sub(r'_' + _brace, lambda m: f'_({m.group(1)})', full_text)
+            
+            # 3b: \sqrt[n]{content} → ⁿ√(content)（在 \sqrt{} 之前，避免误匹配）
+            full_text = re.sub(
+                r'\\sqrt\s*\[([^\]]+)\]\s*' + _brace,
+                lambda m: f'{m.group(1)}√({m.group(2)})',
+                full_text
+            )
+            
+            # 3c: \sqrt{content} → √(content)
+            full_text = re.sub(
+                r'\\sqrt\s*' + _brace,
+                lambda m: f'√({m.group(1)})',
+                full_text
+            )
+            
+            # 3d: \frac{numerator}{denominator} → (numerator)/(denominator)
+            for _ in range(5):  # 多次迭代处理嵌套分数
+                new_text = re.sub(
+                    r'\\frac\s*' + _brace + r'\s*' + _brace,
+                    lambda m: f'({m.group(1)})/({m.group(2)})',
+                    full_text
+                )
+                if new_text == full_text:
+                    break
+                full_text = new_text
+            
+            # 3e: \left 和 \right 命令（只保留括号本身）
+            full_text = re.sub(r'\\left\s*([(\[{|.])', r'\1', full_text)
+            full_text = re.sub(r'\\right\s*([)\]}|.])', r'\1', full_text)
+            
+            # 3f: \text{content} / \mathrm{content} / \textbf{content} → content
+            full_text = re.sub(r'\\(?:text|mathrm|textbf|mathbf|mathit|textit|operatorname)\s*' + _brace, r'\1', full_text)
+            
+            # 3g: \overline{x} → x̄, \bar{x} → x̄
+            full_text = re.sub(r'\\(?:overline|bar)\s*' + _brace, lambda m: m.group(1) + '̄', full_text)
+            
+            # 3h: \vec{x} → x⃗
+            full_text = re.sub(r'\\vec\s*' + _brace, lambda m: m.group(1) + '⃗', full_text)
+
+            # 步骤4：替换LaTeX命令为Unicode符号（在移除反斜杠之前！）
+            latex_commands = {
+                # 希腊字母
+                r'\alpha': 'α', r'\beta': 'β', r'\gamma': 'γ', r'\delta': 'δ',
+                r'\epsilon': 'ε', r'\zeta': 'ζ', r'\eta': 'η', r'\theta': 'θ',
+                r'\lambda': 'λ', r'\mu': 'μ', r'\nu': 'ν', r'\xi': 'ξ',
+                r'\pi': 'π', r'\rho': 'ρ', r'\sigma': 'σ', r'\tau': 'τ',
+                r'\phi': 'φ', r'\chi': 'χ', r'\psi': 'ψ', r'\omega': 'ω',
+                r'\Gamma': 'Γ', r'\Delta': 'Δ', r'\Theta': 'Θ', r'\Lambda': 'Λ',
+                r'\Sigma': 'Σ', r'\Phi': 'Φ', r'\Psi': 'Ψ', r'\Omega': 'Ω',
+                # 运算符
+                r'\cdot': '·', r'\times': '×', r'\div': '÷', r'\pm': '±',
+                r'\mp': '∓', r'\circ': '∘', r'\star': '★',
+                # 关系符号
+                r'\leq': '≤', r'\geq': '≥', r'\neq': '≠', r'\approx': '≈',
+                r'\equiv': '≡', r'\sim': '∼', r'\propto': '∝',
+                r'\ll': '≪', r'\gg': '≫', r'\subset': '⊂', r'\supset': '⊃',
+                r'\subseteq': '⊆', r'\supseteq': '⊇', r'\in': '∈', r'\notin': '∉',
+                # 箭头
+                r'\to': '→', r'\rightarrow': '→', r'\leftarrow': '←',
+                r'\Rightarrow': '⇒', r'\Leftarrow': '⇐', r'\Leftrightarrow': '⇔',
+                r'\implies': '⇒', r'\iff': '⇔',
+                # 其他
+                r'\infty': '∞', r'\partial': '∂', r'\nabla': '∇',
+                r'\forall': '∀', r'\exists': '∃', r'\emptyset': '∅',
+                r'\angle': '∠', r'\triangle': '△', r'\perp': '⊥', r'\parallel': '∥',
+                r'\therefore': '∴', r'\because': '∵',
+                r'\sum': 'Σ', r'\prod': 'Π', r'\int': '∫',
+                r'\ldots': '…', r'\cdots': '⋯', r'\dots': '…',
+                r'\quad': '  ', r'\qquad': '    ',
+                r'\,': ' ', r'\;': ' ', r'\!': '',
+                r'\log': 'log', r'\ln': 'ln', r'\sin': 'sin', r'\cos': 'cos',
+                r'\tan': 'tan', r'\cot': 'cot', r'\sec': 'sec', r'\csc': 'csc',
+                r'\lim': 'lim', r'\max': 'max', r'\min': 'min',
             }
-            # 遍历替换字典，将所有LaTeX命令替换为对应的Unicode符号
-            for k, v in replacements.items():
-                full_text = full_text.replace(k, v)
-                
-            # 步骤5：移除LaTeX的大括号（用于分组）
-            # 这些在纯文本显示中不需要
+            # 按键长度降序排列，避免短命令误匹配长命令的前缀
+            for cmd in sorted(latex_commands.keys(), key=len, reverse=True):
+                full_text = full_text.replace(cmd, latex_commands[cmd])
+            
+            # 步骤5：移除剩余的反斜杠命令（未知命令直接去掉反斜杠）
+            full_text = re.sub(r'\\([a-zA-Z]+)', r'\1', full_text)
+            # 移除孤立的反斜杠
+            full_text = full_text.replace("\\", "")
+            
+            # 步骤6：常见上标字符替换
+            superscripts = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+                           '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+                           'n': 'ⁿ', '+': '⁺', '-': '⁻'}
+            # 单字符上标: ^x → 上标字符
+            def _replace_sup(m):
+                ch = m.group(1)
+                return superscripts.get(ch, '^' + ch)
+            full_text = re.sub(r'\^([0-9n+\-])', _replace_sup, full_text)
+            
+            # 步骤7：移除残余大括号
             full_text = full_text.replace("{", "").replace("}", "")
             
-            # 步骤6：调用父类Text的构造函数，使用清理后的文本进行渲染
-            # 所有其他参数（如font_size、color等）都原样传递给Text类
+            # 步骤8：清理多余空格
+            full_text = re.sub(r'\s+', ' ', full_text).strip()
+            
+            # 步骤9：调用父类Text的构造函数
             super().__init__(full_text, **kwargs)
 
     # ========================================================================
@@ -304,23 +371,10 @@ class TeachingScene(Scene):
         # 将标题添加到场景中（立即显示）
         self.add(self.title)
 
-        # 步骤2：创建垂直分隔线
+        # 步骤2：设置分隔区域的x坐标（不再显示可见的分隔线）
         # 屏幕宽度通常是14.22单位，高度是8.0单位
-        # 将分隔线放置在x = -2.5处，将屏幕分为左右两部分
+        # 逻辑分隔位置在x = -2.5处，将屏幕分为左右两部分
         self.divider_x = -2.5
-        # 创建一条从顶部到底部的垂直线
-        line = Line(
-            # 起点：屏幕顶部（UP * frame_height/2）加上分隔线的x坐标
-            start=UP * config.frame_height / 2 + RIGHT * self.divider_x,
-            # 终点：屏幕底部（DOWN * frame_height/2）加上分隔线的x坐标
-            end=DOWN * config.frame_height / 2 + RIGHT * self.divider_x,
-            # 线条宽度：2像素
-            stroke_width=2,
-            # 线条颜色：灰色
-            color=GRAY
-        )
-        # 将分隔线添加到场景中
-        self.add(line)
 
         # 步骤3：创建讲义笔记（左侧区域）
         # 创建一个VGroup来包含所有笔记文本对象

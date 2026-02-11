@@ -44,6 +44,20 @@ def main():
               ...
             media/               # 渲染后的视频文件目录
     """
+    # === 修复 Windows GBK 编码导致 emoji 打印崩溃 ===
+    # Windows 默认终端编码为 GBK，无法编码 emoji 字符（如 🚀），
+    # 会触发 UnicodeEncodeError 导致整个 CLI 进程立即崩溃。
+    # 强制将 stdout/stderr 切换为 UTF-8 编码，errors='replace' 防止任何残留字符炸掉。
+    import sys as _sys
+    try:
+        _sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, OSError):
+        pass  # Python < 3.7 或特殊环境
+    try:
+        _sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, OSError):
+        pass
+
     # 创建命令行参数解析器，设置程序描述
     parser = argparse.ArgumentParser(description="Auto Math Video Generator")
     # 添加可选位置参数：主题/问题/描述（允许为空，配合图片输入）
@@ -148,8 +162,11 @@ def main():
         raise SystemExit(1)
 
     # 步骤1.1: 用 AI 生成的 topic 重命名项目文件夹（让文件夹名有意义）
+    # 注意：当 --output-dir 由 Web 后端指定时，跳过重命名！
+    # 后端通过 task_id 追踪项目目录，如果 CLI 擅自改名，后端会找不到目录，
+    # 导致出现"一次提交两个项目"的问题（原目录残留 + 新目录被创建）。
     ai_topic = storyboard.get("topic", "").strip()
-    if ai_topic:
+    if ai_topic and not args.output_dir:
         new_slug = make_slug(ai_topic)
         new_base_dir = rename_project_dir(base_output_dir, new_slug)
         if new_base_dir != base_output_dir:

@@ -8,7 +8,6 @@ import os
 import sys
 import json
 import asyncio
-import shlex
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Request
 from pydantic import BaseModel
@@ -24,23 +23,12 @@ OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 active_connections: dict[str, list[WebSocket]] = {}
 
 
-def _quote_arg(s: str) -> str:
+def _detect_python_command() -> list:
     """
-    跨平台安全引用 shell 参数。
+    自动检测可用的 Python 执行命令，返回命令参数列表。
     
-    shlex.quote 在 Windows 上使用单引号包裹，但 cmd.exe 不认单引号，
-    会导致参数中包含字面单引号字符。本函数在 Windows 上使用双引号包裹。
-    """
-    if sys.platform == "win32":
-        # Windows cmd.exe 使用双引号；转义内部的双引号
-        escaped = s.replace('"', '\\"')
-        return f'"{escaped}"'
-    return shlex.quote(s)
-
-
-def _detect_python_command() -> str:
-    """
-    自动检测可用的 Python 执行命令。
+    返回列表而非字符串，供 create_subprocess_exec 直接使用，
+    完全避免 shell 解析问题（用户输入可能包含 $, >, ^, () 等 cmd.exe 特殊字符）。
     
     优先级：
     1. 项目根目录下的 .venv 虚拟环境
@@ -56,15 +44,15 @@ def _detect_python_command() -> str:
         venv_python = os.path.join(PROJECT_ROOT, ".venv", "bin", "python")
     
     if os.path.isfile(venv_python):
-        return f'"{venv_python}" -u'
+        return [venv_python, "-u"]
     
     # 检查 conda
     conda_path = shutil.which("conda")
     if conda_path:
-        return 'conda run -n mathvideo --no-capture-output python -u'
+        return [conda_path, "run", "-n", "mathvideo", "--no-capture-output", "python", "-u"]
     
     # 回退到系统 Python
-    return f'"{sys.executable}" -u'
+    return [sys.executable, "-u"]
 
 
 class GenerateRequest(BaseModel):
@@ -168,28 +156,26 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         await broadcast_status(task_id, "running")
         await broadcast_log(task_id, f"🚀 开始生成项目: {prompt or '（仅图片输入）'}")
         
-        # 构建命令参数
-        # 使用 _quote_arg 代替 shlex.quote，因为 shlex.quote 在 Windows 上
-        # 使用单引号包裹，而 cmd.exe 不认单引号，导致参数包含字面单引号字符
-        args = []
+        # 构建命令参数列表（不经过 shell，避免 cmd.exe 解析特殊字符）
+        # 用户输入的数学题目可能包含 $, >, ^, (), {} 等字符，
+        # 如果用 create_subprocess_shell 通过 cmd.exe 解析，这些字符会被当作
+        # 重定向/转义/分组等操作符，导致 --output-dir 和 --render 参数丢失。
+        # 使用 create_subprocess_exec 直接传参数列表，完全绕过 shell 解析。
+        python_cmd = _detect_python_command()  # 返回 list，如 [".venv/.../python.exe", "-u"]
+        cmd_parts = python_cmd + ["-m", "mathvideo"]
+        
         if prompt:
-            args.append(_quote_arg(prompt))
+            cmd_parts.append(prompt)
         
         # 传递 --output-dir 让 CLI 使用后端已准备好的目录（图片已保存在其中）
         # 这避免了 CLI 重新生成 slug 可能导致的路径不一致
         output_dir = os.path.join(OUTPUT_DIR, task_id)
-        args.extend(["--output-dir", _quote_arg(output_dir)])
+        cmd_parts.extend(["--output-dir", output_dir])
         
         for img_path in (image_paths or []):
-            args.extend(["--image", _quote_arg(img_path)])
+            cmd_parts.extend(["--image", img_path])
         if render:
-            args.append("--render")
-        
-        args_str = " ".join(args)
-        
-        # 自动检测 Python 环境（优先 .venv，然后 conda，最后系统 Python）
-        python_cmd = _detect_python_command()
-        shell_cmd = f'{python_cmd} -m mathvideo {args_str}'
+            cmd_parts.append("--render")
         
         await broadcast_log(task_id, f"📂 输出目录: output/{task_id}")
         
@@ -197,11 +183,12 @@ async def run_generation(task_id: str, prompt: str, render: bool, image_paths: O
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"  # 禁用 Python 输出缓冲
         env["PYTHONIOENCODING"] = "utf-8"  # 强制子进程使用 UTF-8 编码输出
+        env["PYTHONUTF8"] = "1"  # Python UTF-8 模式（3.7+ 双保险）
         existing_pythonpath = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = PROJECT_ROOT + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
         
-        process = await asyncio.create_subprocess_shell(
-            shell_cmd,
+        process = await asyncio.create_subprocess_exec(
+            *cmd_parts,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=PROJECT_ROOT,
@@ -261,22 +248,20 @@ def _detect_renamed_slug(task_id: str) -> str:
     """
     检测 CLI 是否已将项目目录重命名。
     
-    通过在 output 目录中查找包含 task_id 哈希后缀的目录来精确匹配，
-    避免并发生成时通过"最新修改时间"误匹配其他项目。
+    由于 Web 模式下 CLI 不再重命名目录（--output-dir 跳过重命名），
+    这里只做简单验证：目录存在则返回原 task_id，否则尝试回退查找。
     
     参数:
         task_id: 原始任务 ID（slug）
     
     返回:
-        str: 实际的 slug（可能是重命名后的）
+        str: 实际的 slug
     """
     task_dir = os.path.join(OUTPUT_DIR, task_id)
     if os.path.exists(task_dir):
         return task_id
     
-    # 提取 task_id 的哈希部分（最后的 -xxxxxx）
-    # 重命名后新 slug 的哈希可能不同，所以需要更稳健的检测
-    # 策略：查找 storyboard.json 中 input_text 匹配的目录
+    # 回退：万一旧版 CLI 仍做了重命名，按最近修改时间查找
     try:
         if not os.path.isdir(OUTPUT_DIR):
             return task_id
@@ -285,7 +270,6 @@ def _detect_renamed_slug(task_id: str) -> str:
             d_path = os.path.join(OUTPUT_DIR, d)
             if not os.path.isdir(d_path):
                 continue
-            # 检查 storyboard.json 是否存在
             sb_path = os.path.join(d_path, "storyboard.json")
             if os.path.exists(sb_path):
                 candidates.append((d, os.path.getmtime(d_path)))
@@ -293,7 +277,6 @@ def _detect_renamed_slug(task_id: str) -> str:
         if not candidates:
             return task_id
         
-        # 取最近修改的目录（该任务刚完成，其目录应该是最新的）
         candidates.sort(key=lambda x: x[1], reverse=True)
         return candidates[0][0]
     except OSError:
